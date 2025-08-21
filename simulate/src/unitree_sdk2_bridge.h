@@ -16,6 +16,12 @@
 
 #define MOTOR_SENSOR_NUM 3
 
+template <typename T, typename = void>
+struct has_foot_force : std::false_type {};
+
+template <typename T>
+struct has_foot_force<T, std::void_t<decltype(std::declval<T&>().foot_force())>> : std::true_type {};
+
 class UnitreeSDK2BridgeBase
 {
 public:
@@ -221,7 +227,7 @@ public:
                 lowstate->msg_.imu_state().accelerometer()[1] = mj_data_->sensordata[imu_acc_adr_ + 1];
                 lowstate->msg_.imu_state().accelerometer()[2] = mj_data_->sensordata[imu_acc_adr_ + 2];
             }
-            
+
             lowstate->msg_.tick() = std::round(mj_data_->time / 1e-3);
             lowstate->unlockAndPublish();
         }
@@ -254,7 +260,56 @@ private:
     unitree::common::RecurrentThreadPtr thread_;
 };
 
-using Go2Bridge = RobotBridge<unitree::robot::go2::subscription::LowCmd, unitree::robot::go2::publisher::LowState>;
+class Go2Bridge : public RobotBridge<unitree::robot::go2::subscription::LowCmd, unitree::robot::go2::publisher::LowState>
+{
+public:
+    Go2Bridge(mjModel *model, mjData *data) : RobotBridge(model, data)
+    {
+        int sensor_id = -1;
+
+        // Force sensor
+        sensor_id = mj_name2id(mj_model_, mjOBJ_SENSOR, "FR_touch");
+        if (sensor_id >= 0) {
+            FR_touch_adr_ = mj_model_->sensor_adr[sensor_id];
+        }
+
+        // Foot position sensor
+        sensor_id = mj_name2id(mj_model_, mjOBJ_SENSOR, "FR_pos");
+        if (sensor_id >= 0) {
+            FR_pos_adr_ = mj_model_->sensor_adr[sensor_id];
+        }
+
+        // Foot linear velocity sensor
+        sensor_id = mj_name2id(mj_model_, mjOBJ_SENSOR, "FR_linvel");
+        if (sensor_id >= 0) {
+            FR_linvel_adr_ = mj_model_->sensor_adr[sensor_id];
+        }
+    }
+
+    void run() override
+    {
+        // lowstate
+        if(lowstate->trylock()) {
+            // Foot force: need correction in simulation
+            lowstate->msg_.foot_force()[0] = (int) mj_data_->sensordata[FR_touch_adr_ + 0];
+            lowstate->msg_.foot_force()[1] = (int) mj_data_->sensordata[FR_touch_adr_ + 1];
+            lowstate->msg_.foot_force()[2] = (int) mj_data_->sensordata[FR_touch_adr_ + 2];
+            lowstate->msg_.foot_force()[3] = (int) mj_data_->sensordata[FR_touch_adr_ + 3];
+        }
+        // highstate
+        if(highstate->trylock()) {
+            // Only in simulation: for dapc data collection
+            for(int i=0;i<12;i++) highstate->msg_.foot_position_body()[i] = mj_data_->sensordata[FR_pos_adr_ + i];
+            for(int i=0;i<12;i++) highstate->msg_.foot_speed_body()[i] = mj_data_->sensordata[FR_linvel_adr_ + i];
+        }
+        RobotBridge::run();
+    }
+
+private:
+    int FR_touch_adr_ = -1;
+    int FR_pos_adr_ = -1;
+    int FR_linvel_adr_ = -1;
+};
 
 class G1Bridge : public RobotBridge<unitree::robot::g1::subscription::LowCmd, unitree::robot::g1::publisher::LowState>
 {

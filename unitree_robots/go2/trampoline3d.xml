@@ -1,0 +1,20 @@
+<mujoco>
+  <worldbody>
+    <body name="trampoline" pos="0 0 .05">
+      <flexcomp type="grid" name="trampoline3d" mass="10" rgba="0.5 0.5 0.5 0.65"
+                dim="3" count="10 10 2" spacing=".15 .15 .1" radius=".02">
+        <!-- solref 刚度和阻尼
+          +: (timeconst,dampratio); 
+          -: (−stiffness,−damping) -->
+        <contact condim="3" solref="0.005 1" solimp=".95 .99 .0001 0.5 2"/>
+        <edge equality="false" damping="20"/>
+        <elasticity young="1e5" poisson="0" damping="0.0001" thickness="0.2"/>
+
+        <!-- <pin gridrange="0 0 0  0 0 1"/>
+        <pin gridrange="9 0 0  9 0 1"/>
+        <pin gridrange="0 9 0  0 9 1"/>
+        <pin gridrange="9 9 0  9 9 1"/> -->
+      </flexcomp>
+    </body>
+  </worldbody>
+</mujoco>

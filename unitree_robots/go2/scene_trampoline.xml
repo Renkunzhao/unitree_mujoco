@@ -1,0 +1,41 @@
+<mujoco model="go2 trampoline">
+  <include file="go2.xml"/>
+  <include file="trampoline3d.xml"/>
+
+  <!-- 设置时间步长，求解器(CG, PGS, Newton)，积分器 -->
+  <option timestep="0.001" solver="PGS" tolerance="1e-6" integrator="implicitfast"/>
+
+  <size memory="10M"/>
+
+  <!-- 调整初始相机位置和范围 -->
+  <statistic center="0 0 0.1" extent="2"/>
+
+  <visual>
+    <!-- 从摄像机位置照出的方向性光源，diffuse 散射 ambient 环境 specular 镜面 -->
+    <headlight diffuse="0.6 0.6 0.6" ambient="0.3 0.3 0.3" specular="0 0 0"/>
+    <!-- haze 地平面与天空之间的过渡色 -->
+    <rgba haze="0.15 0.25 0.35 1"/>
+    <!-- azimuth 方位角 0->x 90->y elevation 相机视角俯仰角 - 俯视 + 仰视 -->
+    <global azimuth="90" elevation="-20"/>
+  </visual>
+
+  <asset>
+    <!-- 天空和地面的纹理，天空的纹理不需要引用，会自动使用 -->
+    <texture type="skybox" builtin="gradient" rgb1="0.3 0.5 0.7" rgb2="0 0 0" width="512" height="3072"/>
+    <texture type="2d" name="groundplane" builtin="checker" mark="edge" rgb1="0.2 0.3 0.4" rgb2="0.1 0.2 0.3"
+      markrgb="0.8 0.8 0.8" width="300" height="300"/>
+    <material name="groundplane" texture="groundplane" texuniform="true" texrepeat="5 5" reflectance="0.2"/>
+  </asset>
+
+  <worldbody>
+    <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <!-- size x y用于指定地面大小，都是0则是无穷大，z用于指定网格宽度，但是具体变化看不出来 -->
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane"/>
+
+    <!-- <body pos=".2 0 1.5">
+      <freejoint/>
+      <geom type="sphere" size=".1"/>
+    </body> -->
+
+  </worldbody>
+</mujoco>
