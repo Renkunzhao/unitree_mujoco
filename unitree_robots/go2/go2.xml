@@ -61,7 +61,7 @@
   </asset>
 
   <worldbody>
-    <body name="base_link" pos="0 0 0.445" childclass="go2">
+    <body name="base_link" pos="0 0 0.6" childclass="go2">
       <inertial pos="0.021112 0 -0.005366" quat="-0.000543471 0.713435 -0.00173769 0.700719"
         mass="6.921"
         diaginertia="0.107027 0.0980771 0.0244531" />
@@ -105,6 +105,7 @@
               type="cylinder" class="collision" />
             <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black" />
             <geom name="FL" class="foot" />
+            <site name="FL_sensor" type="sphere" size="0.022" pos="-0.002 0 -0.213" rgba="1 0 0 1.0"/>
             <body name="FL_foot" pos="0 0 -0.213" />
           </body>
         </body>
@@ -140,6 +141,7 @@
               type="cylinder" class="collision" />
             <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black" />
             <geom name="FR" class="foot" />
+            <site name="FR_sensor" type="sphere" size="0.022" pos="-0.002 0 -0.213" rgba="1 0 0 1.0"/>
             <body name="FR_foot" pos="0 0 -0.213" />
           </body>
         </body>
@@ -175,6 +177,7 @@
               type="cylinder" class="collision" />
             <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black" />
             <geom name="RL" class="foot" />
+            <site name="RL_sensor" type="sphere" size="0.022" pos="-0.002 0 -0.213" rgba="1 0 0 1.0"/>
             <body name="RL_foot" pos="0 0 -0.213" />
           </body>
         </body>
@@ -212,6 +215,7 @@
               type="cylinder" class="collision" />
             <geom pos="0 0 -0.213" mesh="foot" class="visual" material="black" />
             <geom name="RR" class="foot" />
+            <site name="RR_sensor" type="sphere" size="0.022" pos="-0.002 0 -0.213" rgba="1 0 0 1.0"/>
             <body name="RR_foot" pos="0 0 -0.213" />
           </body>
         </body>
@@ -280,10 +284,26 @@
     
     <framepos name="frame_pos" objtype="site" objname="imu" />
     <framelinvel name="frame_vel" objtype="site" objname="imu" />
+
+    <!-- ground truth -->
+    <touch name="FL_touch" site="FL_sensor"/>
+    <touch name="FR_touch" site="FR_sensor"/>
+    <touch name="RL_touch" site="RL_sensor"/>
+    <touch name="RR_touch" site="RR_sensor"/>
+
+    <framepos name="FL_pos" objtype="site" objname="FL_sensor" />
+    <framepos name="FR_pos" objtype="site" objname="FR_sensor" />
+    <framepos name="RL_pos" objtype="site" objname="RL_sensor" />
+    <framepos name="RR_pos" objtype="site" objname="RR_sensor" />
+
+    <framelinvel name="FL_linvel" objtype="site" objname="FL_sensor" />
+    <framelinvel name="FR_linvel" objtype="site" objname="FR_sensor" />
+    <framelinvel name="RL_linvel" objtype="site" objname="RL_sensor" />
+    <framelinvel name="RR_linvel" objtype="site" objname="RR_sensor" />
   </sensor>
 
-  <keyframe>
+  <!-- <keyframe>
     <key name="home" qpos="0 0 0.27 1 0 0 0 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8"
       ctrl="0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8 0 0.9 -1.8" />
-  </keyframe>
+  </keyframe> -->
 </mujoco>

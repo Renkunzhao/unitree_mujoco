@@ -172,6 +172,14 @@ void UnitreeSdk2Bridge::PublishHighState()
         high_state_.velocity()[1] = mj_data_->sensordata[dim_motor_sensor_ + 14];
         high_state_.velocity()[2] = mj_data_->sensordata[dim_motor_sensor_ + 15];
 
+        high_state_.foot_force()[0] = (int) mj_data_->sensordata[dim_motor_sensor_ + 16];
+        high_state_.foot_force()[1] = (int) mj_data_->sensordata[dim_motor_sensor_ + 17];
+        high_state_.foot_force()[2] = (int) mj_data_->sensordata[dim_motor_sensor_ + 18];
+        high_state_.foot_force()[3] = (int) mj_data_->sensordata[dim_motor_sensor_ + 19];
+
+        for(int i=0;i<12;i++) high_state_.foot_position_body()[i] = mj_data_->sensordata[dim_motor_sensor_ + 20 + i];
+        for(int i=0;i<12;i++) high_state_.foot_speed_body()[i] = mj_data_->sensordata[dim_motor_sensor_ + 32 + i];
+
         high_state_puber_->Write(high_state_);
     }
 }

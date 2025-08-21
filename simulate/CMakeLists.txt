@@ -6,7 +6,6 @@ enable_language(CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-list(APPEND CMAKE_PREFIX_PATH "/opt/unitree_robotics/lib/cmake")
 find_package(mujoco REQUIRED)
 find_package(unitree_sdk2 REQUIRED)
 
@@ -31,5 +30,12 @@ add_executable(test test/test_unitree_sdk2.cpp)
 target_link_libraries(test unitree_sdk2)
 
 add_executable(jstest src/joystick/jstest.cc src/joystick/joystick.cc)
+
+install(TARGETS unitree_mujoco test jstest
+    DESTINATION bin/${PROJECT_NAME}
+)
+
+install(DIRECTORY ../unitree_robots DESTINATION .)
+install(FILES config.yaml DESTINATION bin)
 
 set(CMAKE_BUILD_TYPE Release)
