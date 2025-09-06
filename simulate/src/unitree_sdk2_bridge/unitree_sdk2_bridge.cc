@@ -71,6 +71,8 @@ void UnitreeSdk2Bridge::PublishLowStateGo()
 {
     if (mj_data_)
     {
+        // tick ms uint32, time s double
+        low_state_go_.tick() = static_cast<uint32_t>(mj_data_->time * 1000.0);
         for (int i = 0; i < num_motor_; i++)
         {
             low_state_go_.motor_state()[i].q() = mj_data_->sensordata[i];
@@ -117,6 +119,8 @@ void UnitreeSdk2Bridge::PublishLowStateHg()
 {
     if (mj_data_)
     {
+        // tick ms uint32, time s double
+        low_state_go_.tick() = static_cast<uint32_t>(mj_data_->time * 1000.0);
         for (int i = 0; i < num_motor_; i++)
         {
             low_state_hg_.motor_state()[i].q() = mj_data_->sensordata[i];
@@ -163,6 +167,9 @@ void UnitreeSdk2Bridge::PublishHighState()
 {
     if (mj_data_ && have_frame_sensor_)
     {
+        // stamp sec(int32) + nanosec(uint_32), time s double
+        high_state_.stamp().sec() = static_cast<int32_t>(mj_data_->time);
+        high_state_.stamp().nanosec() = static_cast<uint32_t>((mj_data_->time - high_state_.stamp().sec()) * 1e9);
 
         high_state_.position()[0] = mj_data_->sensordata[dim_motor_sensor_ + 10];
         high_state_.position()[1] = mj_data_->sensordata[dim_motor_sensor_ + 11];
