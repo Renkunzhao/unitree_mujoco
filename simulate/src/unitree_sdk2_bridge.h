@@ -194,6 +194,9 @@ public:
 
         // lowstate
         if(lowstate->trylock()) {
+            // tick ms uint32, time s double
+            lowstate->msg_.tick() = static_cast<uint32_t>(mj_data_->time * 1000.0);
+
             for(int i(0); i<num_motor_; i++) {
                 lowstate->msg_.motor_state()[i].q() = mj_data_->sensordata[i];
                 lowstate->msg_.motor_state()[i].dq() = mj_data_->sensordata[i + num_motor_];
@@ -233,6 +236,10 @@ public:
         }
         // highstate
         if(highstate->trylock()) {
+            // stamp sec(int32) + nanosec(uint_32), time s double
+            highstate->msg_.stamp().sec() = static_cast<int32_t>(mj_data_->time);
+            highstate->msg_.stamp().nanosec() = static_cast<uint32_t>((mj_data_->time - highstate->msg_.stamp().sec()) * 1e9);
+
             if(frame_pos_adr_ >= 0) {
                 highstate->msg_.position()[0] = mj_data_->sensordata[frame_pos_adr_ + 0];
                 highstate->msg_.position()[1] = mj_data_->sensordata[frame_pos_adr_ + 1];
