@@ -154,6 +154,16 @@ protected:
     }
 };
 
+template<typename T>
+struct HasFootForce {
+    static constexpr bool value = false;
+};
+
+template<>
+struct HasFootForce<unitree::robot::go2::publisher::LowState> {
+    static constexpr bool value = true;
+};
+
 template <typename LowCmd_t, typename LowState_t>
 class RobotBridge : public UnitreeSDK2BridgeBase
 {
@@ -217,21 +227,20 @@ public:
                 lowstate->msg_.imu_state().rpy()[0] = atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y));
                 lowstate->msg_.imu_state().rpy()[1] = asin(2 * (w * y - z * x));
                 lowstate->msg_.imu_state().rpy()[2] = atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
-            }
-            
-            if(imu_gyro_adr_ >= 0) {
-                lowstate->msg_.imu_state().gyroscope()[0] = mj_data_->sensordata[imu_gyro_adr_ + 0];
-                lowstate->msg_.imu_state().gyroscope()[1] = mj_data_->sensordata[imu_gyro_adr_ + 1];
-                lowstate->msg_.imu_state().gyroscope()[2] = mj_data_->sensordata[imu_gyro_adr_ + 2];
-            }
 
-            if(imu_acc_adr_ >= 0) {
-                lowstate->msg_.imu_state().accelerometer()[0] = mj_data_->sensordata[imu_acc_adr_ + 0];
-                lowstate->msg_.imu_state().accelerometer()[1] = mj_data_->sensordata[imu_acc_adr_ + 1];
-                lowstate->msg_.imu_state().accelerometer()[2] = mj_data_->sensordata[imu_acc_adr_ + 2];
-            }
+                lowstate->msg_.imu_state().gyroscope()[0] = mj_data_->sensordata[dim_motor_sensor_ + 4];
+                lowstate->msg_.imu_state().gyroscope()[1] = mj_data_->sensordata[dim_motor_sensor_ + 5];
+                lowstate->msg_.imu_state().gyroscope()[2] = mj_data_->sensordata[dim_motor_sensor_ + 6];
 
-            lowstate->msg_.tick() = std::round(mj_data_->time / 1e-3);
+                lowstate->msg_.imu_state().accelerometer()[0] = mj_data_->sensordata[dim_motor_sensor_ + 7];
+                lowstate->msg_.imu_state().accelerometer()[1] = mj_data_->sensordata[dim_motor_sensor_ + 8];
+                lowstate->msg_.imu_state().accelerometer()[2] = mj_data_->sensordata[dim_motor_sensor_ + 9];
+
+                lowstate->msg_.foot_force()[0] = (int) mj_data_->sensordata[dim_motor_sensor_ + 16];
+                lowstate->msg_.foot_force()[1] = (int) mj_data_->sensordata[dim_motor_sensor_ + 17];
+                lowstate->msg_.foot_force()[2] = (int) mj_data_->sensordata[dim_motor_sensor_ + 18];
+                lowstate->msg_.foot_force()[3] = (int) mj_data_->sensordata[dim_motor_sensor_ + 19];
+            }
             lowstate->unlockAndPublish();
         }
         // highstate

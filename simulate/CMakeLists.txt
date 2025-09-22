@@ -43,3 +43,12 @@ link_libraries(
 add_executable(unitree_mujoco ${SIM_SRC} src/main.cc)
 
 add_executable(jstest src/joystick/jstest.cc src/joystick/joystick.cc)
+
+install(TARGETS unitree_mujoco jstest
+    DESTINATION bin/${PROJECT_NAME}
+)
+
+install(DIRECTORY ../unitree_robots DESTINATION .)
+install(FILES config.yaml DESTINATION bin)
+
+set(CMAKE_BUILD_TYPE Release)
