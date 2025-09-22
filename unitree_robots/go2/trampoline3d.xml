@@ -1,6 +1,7 @@
 <mujoco>
   <worldbody>
     <body name="trampoline" pos="0 0 .05">
+    <!-- note: body pos cheater estimator in DapcController.cpp has to be modified when spacing & radius change -->
       <flexcomp type="grid" name="trampoline3d" mass="10" rgba="0.5 0.5 0.5 0.65"
                 dim="3" count="10 10 2" spacing=".15 .15 .1" radius=".02">
         <!-- solref 刚度和阻尼
