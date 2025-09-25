@@ -179,6 +179,8 @@ public:
         highstate = std::make_unique<HighState_t>();
         wireless_controller = std::make_unique<WirelessController_t>();
         wireless_controller->joystick = joystick;
+        thread_ = std::make_shared<unitree::common::RecurrentThread>(
+            "unitree_bridge", UT_CPU_ID_NONE, 2000, std::bind(&RobotBridge::run, this));
     }
 
     void start()
