@@ -238,10 +238,31 @@ public:
                 lowstate->msg_.imu_state().accelerometer()[1] = mj_data_->sensordata[dim_motor_sensor_ + 8];
                 lowstate->msg_.imu_state().accelerometer()[2] = mj_data_->sensordata[dim_motor_sensor_ + 9];
 
-                lowstate->msg_.foot_force()[0] = (int) mj_data_->sensordata[dim_motor_sensor_ + 16];
-                lowstate->msg_.foot_force()[1] = (int) mj_data_->sensordata[dim_motor_sensor_ + 17];
-                lowstate->msg_.foot_force()[2] = (int) mj_data_->sensordata[dim_motor_sensor_ + 18];
-                lowstate->msg_.foot_force()[3] = (int) mj_data_->sensordata[dim_motor_sensor_ + 19];
+                if constexpr (HasFootForce<LowState_t>::value) {
+                    // lowstate->msg_.foot_force()[0] = (int) mj_data_->sensordata[dim_motor_sensor_ + 16];
+                    // lowstate->msg_.foot_force()[1] = (int) mj_data_->sensordata[dim_motor_sensor_ + 17];
+                    // lowstate->msg_.foot_force()[2] = (int) mj_data_->sensordata[dim_motor_sensor_ + 18];
+                    // lowstate->msg_.foot_force()[3] = (int) mj_data_->sensordata[dim_motor_sensor_ + 19];
+
+                    for (int j = 0; j < 4; j++) {
+                        Eigen::Vector3d foot_force;
+                        foot_force << mj_data_->sensordata[dim_motor_sensor_ + 20 + 3*j],
+                                      mj_data_->sensordata[dim_motor_sensor_ + 21 + 3*j],
+                                      mj_data_->sensordata[dim_motor_sensor_ + 22 + 3*j];
+
+                        // WXYZ
+                        Eigen::Quaterniond foot_quat(
+                            mj_data_->sensordata[dim_motor_sensor_ + 32 + 4*j],
+                            mj_data_->sensordata[dim_motor_sensor_ + 33 + 4*j],
+                            mj_data_->sensordata[dim_motor_sensor_ + 34 + 4*j],
+                            mj_data_->sensordata[dim_motor_sensor_ + 35 + 4*j]
+                        );
+                        foot_quat.normalize();
+                        foot_force = - foot_quat.toRotationMatrix() * foot_force; // 转到世界坐标系
+
+                        lowstate->msg_.foot_force()[j] = foot_force[2]; 
+                    }
+                }
             }
             lowstate->unlockAndPublish();
         }
