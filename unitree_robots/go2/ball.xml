@@ -1,0 +1,25 @@
+<mujoco model="ball">
+
+  <worldbody>
+    <body name="foot" pos="0 0 1">
+      <freejoint/>
+      <inertial diaginertia="9.600000000000001e-06 9.600000000000001e-06 9.600000000000001e-06" mass="40.06" pos="0 0 0"/>
+      <body name="dummy_foot" pos="0 0 0">
+        <inertial diaginertia="1e-14 1e-14 1e-14" mass="1e-6" pos="0 0 0"/>
+        <geom name="foot_geom" size="0.022" pos="0 0 0" priority="1" condim="6" contype="1" conaffinity="1" friction="0.4 0.02 0.01" group="3"/>
+        <site name="foot_sensor" type="sphere" size="0.025" pos="0 0 0" rgba="1 0 0 1.0"/>
+        <site name="foot_force_sensor" pos="0 0 0" size="0.017" type="sphere"/>
+      </body>
+    </body>
+  </worldbody>
+
+  <sensor>
+    <touch name="touch" site="foot_sensor"/>
+    <force name="force" site="foot_force_sensor"/>
+    <framequat name="foot_quat" objtype="site" objname="foot_sensor"/>
+    <framepos name="foot_pos" objtype="site" objname="foot_sensor" />
+    <framelinvel name="foot_linvel" objtype="site" objname="foot_sensor" />
+    <!-- <contact name="contact" geom1="foot_geom" num="3" data="force" reduce="netforce"/> -->
+  </sensor>
+
+</mujoco>

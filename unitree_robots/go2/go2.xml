@@ -1,7 +1,7 @@
 <mujoco model="go2">
   <compiler angle="radian" meshdir="assets" autolimits="true" />
 
-  <option cone="elliptic" impratio="100" timestep="0.001"/>
+  <option cone="elliptic" impratio="100"/>
 
   <default>
     <default class="go2">
@@ -29,12 +29,12 @@
       <default class="collision">
         <geom group="3"/>
         <default class="foot">
-          <geom size="0.022" pos="-0.002 0 -0.213" priority="1" condim="6"
+          <geom size="0.022" pos="0 0 0" priority="1" condim="6"
             friction="0.4 0.02 0.01"/>
         </default>
       </default>
       <default class="touch_site">
-        <site type="sphere" size="0.025" pos="-0.002 0 0" rgba="1 0 0 1.0"/>
+        <site type="sphere" size="0.025" pos="0 0 0" rgba="1 0 0 1.0"/>
       </default>
     </default>
   </default>
@@ -64,7 +64,7 @@
   </asset>
 
   <worldbody>
-    <body name="base_link" pos="0 0 0.6" childclass="go2">
+    <body name="base_link" pos="0 0 1.5" childclass="go2">
       <inertial pos="0.021112 0 -0.005366" quat="-0.000543471 0.713435 -0.00173769 0.700719"
         mass="6.921"
         diaginertia="0.107027 0.0980771 0.0244531" />
@@ -110,14 +110,14 @@
             <geom name="FL" class="foot" />
             <site name="FL_sensor" class="touch_site"/>
             <body name="FL_foot" pos="0 0 -0.213" /> -->
-            <body name="FL_foot" pos="0 0 -0.213">
+            <body name="FL_foot" pos="-0.002 0 -0.213">
               <inertial diaginertia="9.600000000000001e-06 9.600000000000001e-06 9.600000000000001e-06" mass="0.06" pos="0 0 0"/>
               <body name="FL_foot_for_collision" pos="0 0 0">
                 <inertial diaginertia="1e-14 1e-14 1e-14" mass="1e-6" pos="0 0 0"/>
                 <geom class="visual" pos="0 0 0" mesh="foot"  material="black" />
-                <geom class="collision" pos="-0.002 0 0" size="0.022" type="sphere"/>
+                <geom name="FL" class="foot" />
                 <site name="FL_sensor" class="touch_site"/>
-                <site name="FL_grf_sensor" pos="-0.002 0 0" size="0.017" type="sphere"/>
+                <site name="FL_grf_sensor" pos="0 0 0" size="0.017" type="sphere"/>
               </body>
             </body>
           </body>
@@ -156,14 +156,14 @@
             <geom name="FR" class="foot" />
             <site name="FR_sensor" class="touch_site"/>
             <body name="FR_foot" pos="0 0 -0.213" /> -->
-            <body name="FR_foot" pos="0 0 -0.213">
+            <body name="FR_foot" pos="-0.002 0 -0.213">
               <inertial diaginertia="9.600000000000001e-06 9.600000000000001e-06 9.600000000000001e-06" mass="0.06" pos="0 0 0"/>
               <body name="FR_foot_for_collision" pos="0 0 0">
                 <inertial diaginertia="1e-14 1e-14 1e-14" mass="1e-6" pos="0 0 0"/>
-                <geom class="visual" pos="0 0 0" mesh="foot"  material="black" />
-                <geom class="collision" pos="-0.002 0 0" size="0.022" type="sphere"/>
+                <geom class="visual" pos="0 0 0" mesh="foot"  material="black" /> 
+                <geom name="FR" class="foot" />
                 <site name="FR_sensor" class="touch_site"/>
-                <site name="FR_grf_sensor" pos="-0.002 0 0" size="0.017" type="sphere"/>
+                <site name="FR_grf_sensor" pos="0 0 0" size="0.017" type="sphere"/>
               </body>
             </body>
           </body>
@@ -202,14 +202,14 @@
             <geom name="RL" class="foot" />
             <site name="RL_sensor" class="touch_site"/>
             <body name="RL_foot" pos="0 0 -0.213" /> -->
-            <body name="RL_foot" pos="0 0 -0.213">
+            <body name="RL_foot" pos="-0.002 0 -0.213">
               <inertial diaginertia="9.600000000000001e-06 9.600000000000001e-06 9.600000000000001e-06" mass="0.06" pos="0 0 0"/>
               <body name="RL_foot_for_collision" pos="0 0 0">
                 <inertial diaginertia="1e-14 1e-14 1e-14" mass="1e-6" pos="0 0 0"/>
                 <geom class="visual" pos="0 0 0" mesh="foot"  material="black" />
-                <geom class="collision" pos="-0.002 0 0" size="0.022" type="sphere"/>
+                <geom name="RL" class="foot" />
                 <site name="RL_sensor" class="touch_site"/>
-                <site name="RL_grf_sensor" pos="-0.002 0 0" size="0.017" type="sphere"/>
+                <site name="RL_grf_sensor" pos="0 0 0" size="0.017" type="sphere"/>
               </body>
             </body>
           </body>
@@ -250,14 +250,14 @@
             <!-- <geom name="RR" class="foot" /> -->
             <!-- <site name="RR_sensor" class="touch_site"/> -->
             <!-- <body name="RR_foot" pos="0 0 -0.213" /> -->
-            <body name="RR_foot" pos="0 0 -0.213">
+            <body name="RR_foot" pos="-0.002 0 -0.213">
               <inertial diaginertia="9.600000000000001e-06 9.600000000000001e-06 9.600000000000001e-06" mass="0.06" pos="0 0 0"/>
               <body name="RR_foot_for_collision" pos="0 0 0">
                 <inertial diaginertia="1e-14 1e-14 1e-14" mass="1e-6" pos="0 0 0"/>
                 <geom class="visual" pos="0 0 0" mesh="foot"  material="black" />
-                <geom class="collision" pos="-0.002 0 0" size="0.022" type="sphere"/>
+                <geom name="RR" class="foot" />
                 <site name="RR_sensor" class="touch_site"/>
-                <site name="RR_grf_sensor" pos="-0.002 0 0" size="0.017" type="sphere"/>
+                <site name="RR_grf_sensor" pos="0 0 0" size="0.017" type="sphere"/>
               </body>
             </body>
           </body>
@@ -345,7 +345,7 @@
     <framequat name="RR_foot_quat" objname="RR_grf_sensor" objtype="site"/>
     <framequat name="RL_foot_quat" objname="RL_grf_sensor" objtype="site"/>
 
-    <!-- <framepos name="FR_pos" objtype="site" objname="FR_sensor" />
+    <framepos name="FR_pos" objtype="site" objname="FR_sensor" />
     <framepos name="FL_pos" objtype="site" objname="FL_sensor" />
     <framepos name="RR_pos" objtype="site" objname="RR_sensor" />
     <framepos name="RL_pos" objtype="site" objname="RL_sensor" />

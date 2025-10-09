@@ -1,0 +1,31 @@
+<mujoco>
+  <worldbody>
+    <body name="FL_1">
+      <inertial pos="0 0 0" mass="1" diaginertia="1.66667e-05 1.66667e-05 1.66667e-05"/>
+      <joint pos="0 0 0" axis="1 0 0" type="slide"/>
+      <joint pos="0 0 0" axis="0 1 0" type="slide"/>
+      <joint pos="0 0 0" axis="0 0 1" type="slide"/>
+    </body>
+    <body name="FL_2" pos="0.2 0 0">
+      <inertial pos="0 0 0" mass="1" diaginertia="1.66667e-05 1.66667e-05 1.66667e-05"/>
+      <joint pos="0 0 0" axis="1 0 0" type="slide"/>
+      <joint pos="0 0 0" axis="0 1 0" type="slide"/>
+      <joint pos="0 0 0" axis="0 0 1" type="slide"/>
+    </body>
+
+    <flexcomp name="grid1d" type="grid" dim="1" count="3 1 1" pos="0 1 0.5" mass="3" spacing="0.2 0.2 0.2">
+      <pin id="0"/>
+    </flexcomp>
+
+    <flexcomp name="grid1d-radius" type="grid" dim="1" count="3 1 1" pos="0 -1 0.5" mass="3" spacing="0.2 0.2 0.2" radius="0.1">
+      <pin id="0"/>
+    </flexcomp>
+  </worldbody>
+  <deformable>
+    <flex name="FL" dim="1" body="world FL_1 FL_2" vertex="-0.2 0 0.5 0 0 0 0 0 0" element="0 1 1 2"/>
+  </deformable>
+  <!-- Add a soft equality constraint to the flex edge, making it resist to change -->
+  <equality>
+    <flex flex="FL"/>  
+  </equality>   
+</mujoco>

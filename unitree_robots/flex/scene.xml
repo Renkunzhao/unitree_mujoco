@@ -1,7 +1,12 @@
-<mujoco model="go2 trampoline">
-  <!-- <include file="ball.xml"/> -->
-  <include file="go2.xml"/>
+<mujoco>
+  <include file="ball.xml"/>
+  <!-- <include file="grid3d.xml"/> -->
+  <!-- <include file="disc.xml"/> -->
+  <!-- <include file="edge.xml"/> -->
+  <!-- <include file="flex.xml"/> -->
+  <!-- <include file="demo.xml"/> -->
   <include file="trampoline.xml"/>
+
 
   <!-- 设置时间步长，求解器(CG, PGS, Newton)，积分器 -->
   <option timestep="0.001" solver="PGS" tolerance="1e-6" integrator="implicitfast"/>
@@ -30,5 +35,7 @@
 
   <worldbody>
     <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <!-- size x y用于指定地面大小，都是0则是无穷大，z用于指定网格宽度，但是具体变化看不出来 -->
+    <!-- <geom name="floor" size="0 0 0.05" type="plane" material="groundplane" contype="1" conaffinity="1"/> -->
   </worldbody>
 </mujoco>

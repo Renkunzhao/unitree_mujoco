@@ -1,9 +1,10 @@
 <mujoco>
   <worldbody>
-    <body name="trampoline" pos="0 0 .05">
+    <body name="grid" pos="0 0 .05">
     <!-- note: body pos cheater estimator in DapcController.cpp has to be modified when spacing & radius change -->
-      <flexcomp type="grid" name="trampoline3d" mass="10" rgba="0.5 0.5 0.5 0.65"
-                dim="3" count="10 10 2" spacing=".15 .15 .1" radius=".02">
+    <!-- 10 10 .28 .28 ;  20 5 .29 .28 ; -->
+      <flexcomp type="grid" name="trampoline3d" mass="100" rgba="0.5 0.5 0.5 0.65"
+                dim="3" count="20 5 2" spacing=".29 .28 .1" radius=".02">
         <!-- solref 刚度和阻尼
           +: (timeconst,dampratio); 
           -: (−stiffness,−damping) -->
@@ -16,6 +17,14 @@
         <pin gridrange="0 9 0  0 9 1"/>
         <pin gridrange="9 9 0  9 9 1"/> -->
       </flexcomp>
+    </body>
+
+    <body name="disc" pos="0 2 .05">
+      <flexcomp type="disc" count="9 9 1" spacing=".2 .2 .2" 
+                radius=".02" mass="0.2" name="plate" dim="2">
+        <contact condim="3" conaffinity="3" contype="3" solref="0.02 1" solimp=".8 .9 .001"/>
+        <edge equality="true" damping="10"/>
+      </flexcomp> 
     </body>
   </worldbody>
 </mujoco>

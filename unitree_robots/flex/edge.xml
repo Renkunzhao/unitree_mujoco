@@ -1,0 +1,8 @@
+<mujoco>
+  <worldbody>
+    <flexcomp name="grid1d" type="grid" dim="1" count="2 1 1" pos="0 0 .3" mass=".01" spacing=".4 .4 .4" euler="0 -90 0" radius="0.1">
+        <!-- <edge equality="true"/> -->
+        <edge stiffness="1" damping="0."/>
+    </flexcomp>
+  </worldbody>
+</mujoco>

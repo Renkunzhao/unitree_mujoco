@@ -1,0 +1,36 @@
+<mujoco>
+  <worldbody>
+    <!-- size x y用于指定地面大小，都是0则是无穷大，z用于指定网格宽度，但是具体变化看不出来 -->
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane" contype="1" conaffinity="1"/>
+
+    <!-- note: body pos cheater estimator in DapcController.cpp has to be modified when spacing & radius change -->
+    <!-- solref 刚度和阻尼
+      +: (timeconst,dampratio); 
+      -: (−stiffness,−damping) -->
+
+      <!-- <flexcomp name="trampoline" pos="0 0 .05" 
+                type="grid" dim="3" count="10 10 2" spacing=".15 .15 .1" radius=".02"
+                mass="10" 
+                >
+        <contact condim="3" solref="0.005 1" solimp=".95 .99 .0001 0.5 2"/>
+        <edge equality="false" damping="20"/>
+        <elasticity young="1e5" poisson="0" damping="0.0001" thickness="0.2"/>
+      </flexcomp> -->
+
+      <!-- <flexcomp name="trampoline" pos="0 0 .05" 
+                type="grid" dim="3" count="20 5 2" spacing=".29 .28 .1" radius=".02"
+                mass="100" 
+                >
+        <contact condim="3" solref="0.005 1" solimp=".95 .99 .0001 0.5 2"/>
+        <edge equality="false" damping="20"/>
+        <elasticity young="1e5" poisson="0" damping="0.0001" thickness="0.2"/>
+      </flexcomp> -->
+
+    <flexcomp name="disc" pos="0 0 .02"
+              type="disc"  dim="2" count="9 9 1" spacing=".4 .4 .4" radius=".02"
+              mass="196"
+              >
+      <edge equality="true" solref="0.01 1" solimp="0.8 0.9 0.001 0.1 6"/>
+    </flexcomp> 
+  </worldbody>
+</mujoco>
