@@ -1,6 +1,14 @@
 #pragma once
 
-#include <mujoco/mujoco.h>
+#include <cstddef>
+#ifdef LOGGER
+    #include <logger/CsvLogger.h>
+#endif
+
+#include <csignal>
+extern "C" {
+    #include <mujoco/mujoco.h>
+}
 
 #include <unitree/robot/channel/channel_publisher.hpp>
 #include <unitree/robot/channel/channel_subscriber.hpp>
@@ -55,6 +63,16 @@ public:
                 const char* name = mj_id2name(mj_model_, type, i);
                 if (name) {
                     std::cout << title << "_index: " << getIndex(i) << ", " << "name: " << name;
+                    if (type == mjOBJ_JOINT) {
+                        double low = mj_model_->jnt_range[2 * i];
+                        double high = mj_model_->jnt_range[2 * i + 1];
+                        std::cout << ", jointrange: [" << low << ", " << high << "]";      
+                    }
+                    if (type == mjOBJ_ACTUATOR) {
+                        double low = mj_model_->actuator_ctrlrange[2 * i];
+                        double high = mj_model_->actuator_ctrlrange[2 * i + 1];
+                        std::cout << ", ctrlrange: [" << low << ", " << high << "]";
+                    }
                     if (type == mjOBJ_SENSOR) {
                         std::cout << ", dim: " << mj_model_->sensor_dim[i];
                     }
@@ -181,6 +199,43 @@ public:
         wireless_controller->joystick = joystick;
         thread_ = std::make_shared<unitree::common::RecurrentThread>(
             "unitree_bridge", UT_CPU_ID_NONE, 2000, std::bind(&RobotBridge::run, this));
+
+        foot_size = model->geom_size[mj_name2id(model, mjOBJ_GEOM, "FL") * 3 + 0];
+        std::cout << "[RobotBridge] foot_size: " << foot_size << std::endl;
+
+        #ifdef LOGGER
+            const char* workspace = std::getenv("WORKSPACE");
+            std::string csv_path = workspace ? std::string(workspace) + "/data/mujoco_data.csv" : "/data/mujoco_data.csv";
+            std::cout << "[RobotBridge] Save log data to: " << csv_path << std::endl;
+            CsvLogger& csvLogger = CsvLogger::getInstance();
+            csvLogger.setCsvPath(csv_path);
+            csvLogger.init();
+
+            logThread_ = std::make_shared<unitree::common::RecurrentThread>(
+                "unitree_bridge", UT_CPU_ID_NONE, 5000,  // 每 5000 µs (即 200 Hz) 执行一次
+                [this]() {
+                    CsvLogger& csvLogger = CsvLogger::getInstance();
+
+                    Eigen::VectorXd foot_force(4), foot_pos(4), foot_vel(4);
+
+                    for (int j = 0; j < 4; j++) {
+                        foot_pos[j] = highstate->msg_.foot_position_body()[3*j + 2];
+                        foot_vel[j] = highstate->msg_.foot_speed_body()[3*j + 2];
+                        foot_force[j] = - mj_data_->sensordata[dim_motor_sensor_ + 72 + 3*j + 2];
+                    }
+
+                    csvLogger.update("foot_force", foot_force);
+                    csvLogger.update("foot_pos", foot_pos);
+                    csvLogger.update("foot_vel", foot_vel);
+                }
+            );
+
+            std::signal(SIGINT, +[](int signum) {
+                std::cout << "[RobotBridge] Caught SIGINT." << std::endl;
+                CsvLogger::getInstance().save();
+                std::_Exit(signum);
+            });
+        #endif
     }
 
     void start()
@@ -239,10 +294,10 @@ public:
                 lowstate->msg_.imu_state().accelerometer()[2] = mj_data_->sensordata[dim_motor_sensor_ + 9];
 
                 if constexpr (HasFootForce<LowState_t>::value) {
-                    // lowstate->msg_.foot_force()[0] = (int) mj_data_->sensordata[dim_motor_sensor_ + 16];
-                    // lowstate->msg_.foot_force()[1] = (int) mj_data_->sensordata[dim_motor_sensor_ + 17];
-                    // lowstate->msg_.foot_force()[2] = (int) mj_data_->sensordata[dim_motor_sensor_ + 18];
-                    // lowstate->msg_.foot_force()[3] = (int) mj_data_->sensordata[dim_motor_sensor_ + 19];
+                    lowstate->msg_.foot_force_est()[0] = (int) mj_data_->sensordata[dim_motor_sensor_ + 16];
+                    lowstate->msg_.foot_force_est()[1] = (int) mj_data_->sensordata[dim_motor_sensor_ + 17];
+                    lowstate->msg_.foot_force_est()[2] = (int) mj_data_->sensordata[dim_motor_sensor_ + 18];
+                    lowstate->msg_.foot_force_est()[3] = (int) mj_data_->sensordata[dim_motor_sensor_ + 19];
 
                     for (int j = 0; j < 4; j++) {
                         Eigen::Vector3d foot_force;
@@ -260,8 +315,10 @@ public:
                         foot_quat.normalize();
                         foot_force = - foot_quat.toRotationMatrix() * foot_force; // 转到世界坐标系
 
-                        lowstate->msg_.foot_force()[j] = foot_force[2]; 
+                        // lowstate->msg_.foot_force()[j] = foot_force[2]; 
                     }
+
+                    for (int j = 0; j < 4; j++) lowstate->msg_.foot_force()[j] = (int) - mj_data_->sensordata[dim_motor_sensor_ + 72 + 3*j + 2];
                 }
             }
             lowstate->unlockAndPublish();
@@ -282,6 +339,14 @@ public:
                 highstate->msg_.velocity()[1] = mj_data_->sensordata[frame_vel_adr_ + 1];
                 highstate->msg_.velocity()[2] = mj_data_->sensordata[frame_vel_adr_ + 2];
             }
+
+            // These can only be used in simulation because:
+            //  First, these fields are empty in hardware
+            //  Second, these fields are expressed in body frame according to Unitree Go2 Doc, while mujoco sensor data is expressed in world frame
+            for(int i=0;i<12;i++) highstate->msg_.foot_position_body()[i] = mj_data_->sensordata[dim_motor_sensor_ + 48 + i];
+            for(int i=0;i<12;i++) highstate->msg_.foot_speed_body()[i] = mj_data_->sensordata[dim_motor_sensor_ + 60 + i];
+            for(int i=0;i<4;i++) highstate->msg_.foot_position_body()[3*i+2] -= foot_size;
+
             highstate->unlockAndPublish();
         }
         // wireless_controller
@@ -294,9 +359,12 @@ public:
     std::unique_ptr<WirelessController_t> wireless_controller;
     std::shared_ptr<LowCmd_t> lowcmd;
     std::unique_ptr<LowState_t> lowstate;
+
+    double foot_size = 0;
     
 private:
     unitree::common::RecurrentThreadPtr thread_;
+    unitree::common::RecurrentThreadPtr logThread_;
 };
 
 class Go2Bridge : public RobotBridge<unitree::robot::go2::subscription::LowCmd, unitree::robot::go2::publisher::LowState>

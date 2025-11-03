@@ -354,6 +354,11 @@
     <framelinvel name="FL_linvel" objtype="site" objname="FL_sensor" />
     <framelinvel name="RR_linvel" objtype="site" objname="RR_sensor" />
     <framelinvel name="RL_linvel" objtype="site" objname="RL_sensor" />
+
+    <contact name="FR_contact" geom1="FR" data="force" reduce="netforce"/>
+    <contact name="FL_contact" geom1="FL" data="force" reduce="netforce"/>
+    <contact name="RR_contact" geom1="RR" data="force" reduce="netforce"/>
+    <contact name="RL_contact" geom1="RL" data="force" reduce="netforce"/>
   </sensor>
 
   <!-- <keyframe>

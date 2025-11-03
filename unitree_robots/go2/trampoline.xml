@@ -9,7 +9,7 @@
   <!-- elasticity and edge constraint can't both be present -->
   <!-- 3.2.7 don't support dof in flexcomp -->
   <worldbody>
-    <flexcomp name="disc" pos="0 0 .4"
+    <flexcomp name="trampoline" pos="0 0 .4"
               type="disc"  dim="2" count="9 9 1" spacing=".4 .4 .4" radius=".1"
               mass="196"
               >
@@ -31,11 +31,11 @@
               >
       <pin range="0 19 80 99"/>
       <pin id="20 39 40 59 60 79"/>
-      <edge equality="true" solref="0.02 1" solimp="0.8 0.9 0.001 0.1 6"/> -->
+      <edge equality="true" solref="0.02 1" solimp="0.8 0.9 0.001 0.1 6"/>
       
       <contact  selfcollide="none" contype="1" conaffinity="1" condim="3"
                 solref="0.01 1" solimp=".95 .99 .0001 0.1 6"
-                />
+                /> -->
       
       <!-- 
         edge damping 0 2250 | young 1e4 4e5 | poission 0 0.4 | elasticity damping 0 0.09 

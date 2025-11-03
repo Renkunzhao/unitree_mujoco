@@ -43,6 +43,15 @@ link_libraries(
 )
 
 add_executable(unitree_mujoco ${SIM_SRC} src/main.cc)
+target_link_libraries(unitree_mujoco ${SIM_DEPENDENCIES})
+find_package(logger QUIET)
+if(logger_FOUND)
+    message("Found logger")
+    target_link_libraries(unitree_mujoco logger::CsvLogger)
+    target_compile_definitions(unitree_mujoco PRIVATE LOGGER)
+else()
+    message("logger not found")
+endif()
 
 add_executable(jstest src/joystick/jstest.cc src/joystick/joystick.cc)
 
