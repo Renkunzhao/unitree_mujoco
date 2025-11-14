@@ -203,6 +203,9 @@ public:
         foot_size = model->geom_size[mj_name2id(model, mjOBJ_GEOM, "FL") * 3 + 0];
         std::cout << "[RobotBridge] foot_size: " << foot_size << std::endl;
 
+        std::cout << "[RobotBridge] nflex: " << model->nflex << std::endl;
+        std::cout << "[RobotBridge] flex.raduis: " << model->flex_radius[0] << std::endl;
+
         #ifdef LOGGER
             const char* workspace = std::getenv("WORKSPACE");
             std::string csv_path = workspace ? std::string(workspace) + "/data/mujoco_data.csv" : "/data/mujoco_data.csv";
@@ -216,11 +219,53 @@ public:
                 [this]() {
                     CsvLogger& csvLogger = CsvLogger::getInstance();
 
+                if (flex_flag && mj_data_->time > 5.0) {
+                    std::cout << "[UnitreeSDK2Bridge] Stable static flex pos:" << std::endl;
+
+                    size_t nvert = mj_model_->nflexvert;
+                    double sum_z = 0.0;
+
+                    size_t start_idx=0, end_idx=nvert, add_num=1, total_num=0;
+                    if (mj_model_->flex_dim[0] == 3) {
+                        end_idx = end_idx/2;
+                    }
+
+                    for (size_t i = start_idx; i < end_idx; i+=add_num) {
+                        double x = mj_data_->flexvert_xpos[3 * i + 0];
+                        double y = mj_data_->flexvert_xpos[3 * i + 1];
+                        double z = mj_data_->flexvert_xpos[3 * i + 2];
+
+                        // 这里只以 z 坐标为例计算高度统计，可根据需求改成 x/y/z 的任意分量
+                        flex_pos_max = std::max(flex_pos_max, z);
+                        flex_pos_min = std::min(flex_pos_min, z);
+                        sum_z += z;
+                        total_num++;
+
+                        std::cout << std::fixed << std::setprecision(4)
+                                << "v[" << i << "] = (" << x << ", " << y << ", " << z << ")\n";
+                    }
+
+                    flex_pos_mean = sum_z / total_num;
+
+                    std::cout << std::setprecision(4)
+                            << "[Flex Summary] z_max = " << flex_pos_max
+                            << ", z_min = " << flex_pos_min
+                            << ", z_mean = " << flex_pos_mean << std::endl;
+
+                    if (std::abs(flex_pos_max - flex_pos_min) > threshold) {
+                        std::cerr << "⚠️ [Warning] Flex deformation exceeds threshold: Δz = "
+                                << (flex_pos_max - flex_pos_min)
+                                << " > " << threshold << " m\n";
+                    }
+
+                    flex_flag = false;
+                }
+
                     Eigen::VectorXd foot_force(4), foot_pos(4), foot_vel(4);
 
                     for (int j = 0; j < 4; j++) {
-                        foot_pos[j] = highstate->msg_.foot_position_body()[3*j + 2];
-                        foot_vel[j] = highstate->msg_.foot_speed_body()[3*j + 2];
+                        foot_pos[j] = mj_data_->sensordata[dim_motor_sensor_ + 48 + 3*j + 2] - foot_size - flex_pos_mean - mj_model_->flex_radius[0];
+                        foot_vel[j] = mj_data_->sensordata[dim_motor_sensor_ + 60 + 3*j + 2];
                         foot_force[j] = - mj_data_->sensordata[dim_motor_sensor_ + 72 + 3*j + 2];
                     }
 
@@ -365,6 +410,9 @@ public:
 private:
     unitree::common::RecurrentThreadPtr thread_;
     unitree::common::RecurrentThreadPtr logThread_;
+    bool flex_flag = true;
+    double flex_pos_max = -1e9, flex_pos_min = 1e9, flex_pos_mean = 0.0;
+    const double threshold = 0.05;
 };
 
 class Go2Bridge : public RobotBridge<unitree::robot::go2::subscription::LowCmd, unitree::robot::go2::publisher::LowState>
