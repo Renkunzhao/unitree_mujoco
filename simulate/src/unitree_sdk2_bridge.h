@@ -264,7 +264,7 @@ public:
                     Eigen::VectorXd foot_force(4), foot_pos(4), foot_vel(4);
 
                     for (int j = 0; j < 4; j++) {
-                        foot_pos[j] = mj_data_->sensordata[dim_motor_sensor_ + 48 + 3*j + 2] - foot_size - flex_pos_mean - mj_model_->flex_radius[0];
+                        foot_pos[j] = mj_data_->sensordata[dim_motor_sensor_ + 48 + 3*j + 2] - foot_size - 2*mj_model_->flex_radius[0];
                         foot_vel[j] = mj_data_->sensordata[dim_motor_sensor_ + 60 + 3*j + 2];
                         foot_force[j] = - mj_data_->sensordata[dim_motor_sensor_ + 72 + 3*j + 2];
                     }
