@@ -1,6 +1,5 @@
 <mujoco model="go2 trampoline ground">
   <include file="go2.xml"/>
-  <include file="trampoline_ground.xml"/>
 
   <!-- 设置时间步长，求解器(CG, PGS, Newton)，积分器 -->
   <option timestep="0.001" solver="PGS" tolerance="1e-6" integrator="implicitfast"/>
@@ -29,5 +28,6 @@
 
   <worldbody>
     <light pos="0 0 1.5" dir="0 0 -1" directional="true"/>
+    <geom name="floor" size="0 0 0.05" type="plane" material="groundplane" contype="1" conaffinity="1"/>
   </worldbody>
 </mujoco>

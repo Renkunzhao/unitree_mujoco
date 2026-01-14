@@ -310,8 +310,8 @@
     <accelerometer name="imu_acc" site="imu" />
     
     <!-- ground truth -->
-    <framepos name="frame_pos" objtype="site" objname="imu" />
-    <framelinvel name="frame_vel" objtype="site" objname="imu" />
+    <framepos name="frame_pos" objtype="xbody" objname="base_link" />
+    <framelinvel name="frame_vel" objtype="xbody" objname="base_link" />
 
     <touch name="FR_touch" site="FR_site"/>
     <touch name="FL_touch" site="FL_site"/>
@@ -323,10 +323,10 @@
     <force name="RR_grf" site="RR_force"/>
     <force name="RL_grf" site="RL_force"/>
 
-    <framequat name="FR_foot_quat" objname="FR_force" objtype="site"/>
-    <framequat name="FL_foot_quat" objname="FL_force" objtype="site"/>
-    <framequat name="RR_foot_quat" objname="RR_force" objtype="site"/>
-    <framequat name="RL_foot_quat" objname="RL_force" objtype="site"/>
+    <framequat name="FR_quat" objname="FR_force" objtype="site"/>
+    <framequat name="FL_quat" objname="FL_force" objtype="site"/>
+    <framequat name="RR_quat" objname="RR_force" objtype="site"/>
+    <framequat name="RL_quat" objname="RL_force" objtype="site"/>
 
     <framepos name="FR_pos" objtype="site" objname="FR_site" />
     <framepos name="FL_pos" objtype="site" objname="FL_site" />
