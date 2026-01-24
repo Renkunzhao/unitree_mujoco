@@ -1,9 +1,6 @@
 #pragma once
 
-#ifdef LOGGER
-    #include <logger/CsvLogger.h>
-#endif
-
+#include <csignal>
 #include <mujoco/mujoco.h>
 
 #include <unitree/robot/channel/channel_publisher.hpp>
@@ -17,6 +14,10 @@
 
 #include "param.h"
 #include "physics_joystick.h"
+
+#ifdef LOGGER
+    #include <logger/CsvLogger.h>
+#endif
 
 #define MOTOR_SENSOR_NUM 3
 
