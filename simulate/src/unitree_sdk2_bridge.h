@@ -1,14 +1,10 @@
 #pragma once
 
-#include <cstddef>
 #ifdef LOGGER
     #include <logger/CsvLogger.h>
 #endif
 
-#include <csignal>
-extern "C" {
-    #include <mujoco/mujoco.h>
-}
+#include <mujoco/mujoco.h>
 
 #include <unitree/robot/channel/channel_publisher.hpp>
 #include <unitree/robot/channel/channel_subscriber.hpp>
@@ -23,12 +19,6 @@ extern "C" {
 #include "physics_joystick.h"
 
 #define MOTOR_SENSOR_NUM 3
-
-template <typename T, typename = void>
-struct has_foot_force : std::false_type {};
-
-template <typename T>
-struct has_foot_force<T, std::void_t<decltype(std::declval<T&>().foot_force())>> : std::true_type {};
 
 class UnitreeSDK2BridgeBase
 {
@@ -172,16 +162,6 @@ protected:
     }
 };
 
-template<typename T>
-struct HasFootForce {
-    static constexpr bool value = false;
-};
-
-template<>
-struct HasFootForce<unitree::robot::go2::publisher::LowState> {
-    static constexpr bool value = true;
-};
-
 template <typename LowCmd_t, typename LowState_t>
 class RobotBridge : public UnitreeSDK2BridgeBase
 {
@@ -197,8 +177,6 @@ public:
         highstate = std::make_unique<HighState_t>();
         wireless_controller = std::make_unique<WirelessController_t>();
         wireless_controller->joystick = joystick;
-        thread_ = std::make_shared<unitree::common::RecurrentThread>(
-            "unitree_bridge", UT_CPU_ID_NONE, 2000, std::bind(&RobotBridge::run, this));
 
         foot_size = model->geom_size[mj_name2id(model, mjOBJ_GEOM, "FL") * 3 + 0];
         std::cout << "[RobotBridge] foot_size: " << foot_size << std::endl;
@@ -306,9 +284,6 @@ public:
 
         // lowstate
         if(lowstate->trylock()) {
-            // tick ms uint32, time s double
-            lowstate->msg_.tick() = static_cast<uint32_t>(mj_data_->time * 1000.0);
-
             for(int i(0); i<num_motor_; i++) {
                 lowstate->msg_.motor_state()[i].q() = mj_data_->sensordata[i];
                 lowstate->msg_.motor_state()[i].dq() = mj_data_->sensordata[i + num_motor_];
@@ -329,43 +304,21 @@ public:
                 lowstate->msg_.imu_state().rpy()[0] = atan2(2 * (w * x + y * z), 1 - 2 * (x * x + y * y));
                 lowstate->msg_.imu_state().rpy()[1] = asin(2 * (w * y - z * x));
                 lowstate->msg_.imu_state().rpy()[2] = atan2(2 * (w * z + x * y), 1 - 2 * (y * y + z * z));
-
-                lowstate->msg_.imu_state().gyroscope()[0] = mj_data_->sensordata[dim_motor_sensor_ + 4];
-                lowstate->msg_.imu_state().gyroscope()[1] = mj_data_->sensordata[dim_motor_sensor_ + 5];
-                lowstate->msg_.imu_state().gyroscope()[2] = mj_data_->sensordata[dim_motor_sensor_ + 6];
-
-                lowstate->msg_.imu_state().accelerometer()[0] = mj_data_->sensordata[dim_motor_sensor_ + 7];
-                lowstate->msg_.imu_state().accelerometer()[1] = mj_data_->sensordata[dim_motor_sensor_ + 8];
-                lowstate->msg_.imu_state().accelerometer()[2] = mj_data_->sensordata[dim_motor_sensor_ + 9];
-
-                if constexpr (HasFootForce<LowState_t>::value) {
-                    lowstate->msg_.foot_force_est()[0] = (int) mj_data_->sensordata[dim_motor_sensor_ + 16];
-                    lowstate->msg_.foot_force_est()[1] = (int) mj_data_->sensordata[dim_motor_sensor_ + 17];
-                    lowstate->msg_.foot_force_est()[2] = (int) mj_data_->sensordata[dim_motor_sensor_ + 18];
-                    lowstate->msg_.foot_force_est()[3] = (int) mj_data_->sensordata[dim_motor_sensor_ + 19];
-
-                    for (int j = 0; j < 4; j++) {
-                        Eigen::Vector3d foot_force;
-                        foot_force << mj_data_->sensordata[dim_motor_sensor_ + 20 + 3*j],
-                                      mj_data_->sensordata[dim_motor_sensor_ + 21 + 3*j],
-                                      mj_data_->sensordata[dim_motor_sensor_ + 22 + 3*j];
-
-                        // WXYZ
-                        Eigen::Quaterniond foot_quat(
-                            mj_data_->sensordata[dim_motor_sensor_ + 32 + 4*j],
-                            mj_data_->sensordata[dim_motor_sensor_ + 33 + 4*j],
-                            mj_data_->sensordata[dim_motor_sensor_ + 34 + 4*j],
-                            mj_data_->sensordata[dim_motor_sensor_ + 35 + 4*j]
-                        );
-                        foot_quat.normalize();
-                        foot_force = - foot_quat.toRotationMatrix() * foot_force; // 转到世界坐标系
-
-                        // lowstate->msg_.foot_force()[j] = foot_force[2]; 
-                    }
-
-                    for (int j = 0; j < 4; j++) lowstate->msg_.foot_force()[j] = (int) - mj_data_->sensordata[dim_motor_sensor_ + 72 + 3*j + 2];
-                }
             }
+            
+            if(imu_gyro_adr_ >= 0) {
+                lowstate->msg_.imu_state().gyroscope()[0] = mj_data_->sensordata[imu_gyro_adr_ + 0];
+                lowstate->msg_.imu_state().gyroscope()[1] = mj_data_->sensordata[imu_gyro_adr_ + 1];
+                lowstate->msg_.imu_state().gyroscope()[2] = mj_data_->sensordata[imu_gyro_adr_ + 2];
+            }
+
+            if(imu_acc_adr_ >= 0) {
+                lowstate->msg_.imu_state().accelerometer()[0] = mj_data_->sensordata[imu_acc_adr_ + 0];
+                lowstate->msg_.imu_state().accelerometer()[1] = mj_data_->sensordata[imu_acc_adr_ + 1];
+                lowstate->msg_.imu_state().accelerometer()[2] = mj_data_->sensordata[imu_acc_adr_ + 2];
+            }
+            
+            lowstate->msg_.tick() = std::round(mj_data_->time / 1e-3);
             lowstate->unlockAndPublish();
         }
         // highstate
@@ -384,14 +337,6 @@ public:
                 highstate->msg_.velocity()[1] = mj_data_->sensordata[frame_vel_adr_ + 1];
                 highstate->msg_.velocity()[2] = mj_data_->sensordata[frame_vel_adr_ + 2];
             }
-
-            // These can only be used in simulation because:
-            //  First, these fields are empty in hardware
-            //  Second, these fields are expressed in body frame according to Unitree Go2 Doc, while mujoco sensor data is expressed in world frame
-            for(int i=0;i<12;i++) highstate->msg_.foot_position_body()[i] = mj_data_->sensordata[dim_motor_sensor_ + 48 + i];
-            for(int i=0;i<12;i++) highstate->msg_.foot_speed_body()[i] = mj_data_->sensordata[dim_motor_sensor_ + 60 + i];
-            for(int i=0;i<4;i++) highstate->msg_.foot_position_body()[3*i+2] -= foot_size;
-
             highstate->unlockAndPublish();
         }
         // wireless_controller
@@ -444,19 +389,18 @@ public:
     void run() override
     {
         // lowstate
-        if(lowstate->trylock()) {
-            // Foot force: need correction in simulation
-            lowstate->msg_.foot_force()[0] = (int) mj_data_->sensordata[FR_touch_adr_ + 0];
-            lowstate->msg_.foot_force()[1] = (int) mj_data_->sensordata[FR_touch_adr_ + 1];
-            lowstate->msg_.foot_force()[2] = (int) mj_data_->sensordata[FR_touch_adr_ + 2];
-            lowstate->msg_.foot_force()[3] = (int) mj_data_->sensordata[FR_touch_adr_ + 3];
-        }
+        // Foot force: need correction in simulation
+        lowstate->msg_.foot_force()[0] = (int) mj_data_->sensordata[FR_touch_adr_ + 0];
+        lowstate->msg_.foot_force()[1] = (int) mj_data_->sensordata[FR_touch_adr_ + 1];
+        lowstate->msg_.foot_force()[2] = (int) mj_data_->sensordata[FR_touch_adr_ + 2];
+        lowstate->msg_.foot_force()[3] = (int) mj_data_->sensordata[FR_touch_adr_ + 3];
         // highstate
-        if(highstate->trylock()) {
-            // Only in simulation: for dapc data collection
-            for(int i=0;i<12;i++) highstate->msg_.foot_position_body()[i] = mj_data_->sensordata[FR_pos_adr_ + i];
-            for(int i=0;i<12;i++) highstate->msg_.foot_speed_body()[i] = mj_data_->sensordata[FR_linvel_adr_ + i];
-        }
+        // These can only be used in simulation for dapc data collection because:
+        //  First, these fields are empty in hardware
+        //  Second, these fields are expressed in body frame according to Unitree Go2 Doc, while mujoco sensor data is expressed in world frame
+        for(int i=0;i<12;i++) highstate->msg_.foot_position_body()[i] = mj_data_->sensordata[FR_pos_adr_ + i];
+        for(int i=0;i<12;i++) highstate->msg_.foot_speed_body()[i] = mj_data_->sensordata[FR_linvel_adr_ + i];
+        for(int i=0;i<4;i++) highstate->msg_.foot_position_body()[3*i+2] -= foot_size;
         RobotBridge::run();
     }
 
