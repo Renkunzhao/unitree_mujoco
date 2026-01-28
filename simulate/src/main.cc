@@ -12,10 +12,12 @@
 // See the License for the specific language governing permissions and
 // limitations under the License.
 
-// !!! hack code: make glfw_adapter.window_ public
+// !!! hack code: make glfw_adapter members/methods accessible for chaining callbacks
 #define private public
+#define protected public
 #include "glfw_adapter.h"
 #undef private
+#undef protected
 
 #include <chrono>
 #include <cstdint>
@@ -618,7 +620,7 @@ __attribute__((used, visibility("default"))) extern "C" void _mj_rosettaError(co
 }
 #endif
 
-// user keyboard callback
+// user keyboard callback (chains to Simulate's internal key handler to preserve default controls)
 void user_key_cb(GLFWwindow* window, int key, int scancode, int act, int mods) {
   if (act==GLFW_PRESS)
   {
@@ -634,6 +636,18 @@ void user_key_cb(GLFWwindow* window, int key, int scancode, int act, int mods) {
     if(key==GLFW_KEY_BACKSPACE) {
       mj_resetData(m, d);
       mj_forward(m, d);
+    }
+  }
+
+  // forward to internal handler so that default UI/camera shortcuts still work
+  if (window) {
+    void* ptr = glfwGetWindowUserPointer(window);
+    if (ptr) {
+      auto* adapter = static_cast<mj::GlfwAdapter*>(ptr);
+      // call underlying handler to keep MuJoCo viewer controls
+      if (adapter) {
+        adapter->OnKey(key, scancode, act);
+      }
     }
   }
 }
