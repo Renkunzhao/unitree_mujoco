@@ -187,7 +187,7 @@ public:
 
         #ifdef LOGGER
             const char* workspace = std::getenv("WORKSPACE");
-            std::string csv_path = workspace ? std::string(workspace) + "/data/mujoco_data.csv" : "/data/mujoco_data.csv";
+            std::string csv_path = workspace ? std::string(workspace) + "plot/data/mujoco_data.csv" : "plot/data/mujoco_data.csv";
             std::cout << "[RobotBridge] Save log data to: " << csv_path << std::endl;
             CsvLogger& csvLogger = CsvLogger::getInstance();
             csvLogger.setCsvPath(csv_path);
