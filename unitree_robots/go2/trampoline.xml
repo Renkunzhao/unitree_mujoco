@@ -1,0 +1,27 @@
+<mujoco>
+  <worldbody>
+    <!-- size x y用于指定地面大小，都是0则是无穷大，z用于指定网格宽度，但是具体变化看不出来 -->
+    <!-- note: body pos cheater estimator in DapcController.cpp has to be modified when spacing & radius change -->
+    <!-- solref 刚度和阻尼
+      +: (timeconst,dampratio); 
+      -: (−stiffness,−damping) -->
+    <flexcomp name="trampoline" pos="0 0 .1"
+              type="disc"  dim="2" count="3 3 1" spacing="1.5 1.5 1.5" radius=".03"
+              mass="10"
+              >
+
+    <!-- 3*3 -->
+    <pin id="0 1 2 3 5 6 7 8"/>
+
+    <!-- 4*4 -->
+    <!-- <pin id="0 1 2 3 4 7 8 11 12 13 14 15"/> -->
+
+      <!-- <edge equality="true" solref="0.5 1" solimp="0.001 0.005 0.1 0.1 6"/> -->
+
+      <!-- <edge equality="true" solref="0.01 1" solimp="0.8 0.9 0.001 0.1 6"/> -->
+
+      <edge equality="true" solref="0.002 1" solimp="0.99 1 0.0000001 0.1 6"/>
+
+    </flexcomp>
+  </worldbody>
+</mujoco>

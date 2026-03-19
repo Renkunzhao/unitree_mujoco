@@ -1,6 +1,6 @@
 <mujoco model="go2 trampoline ground">
   <include file="go2.xml"/>
-  <include file="trampoline_ground.xml"/>
+  <include file="trampoline.xml"/>
 
   <!-- 设置时间步长，求解器(CG, PGS, Newton)，积分器 -->
   <option timestep="0.002" solver="PGS" tolerance="1e-6" integrator="implicitfast"/>

@@ -9,8 +9,8 @@
     <geom name="floor" size="0 0 0.05" type="plane" material="groundplane" contype="1" conaffinity="1"/>
 
     <flexcomp name="trampoline" pos="0 0 .1"
-              type="disc"  dim="2" count="10 10 1" spacing=".8 .8 .8" radius=".1"
-              mass="10"
+              type="disc"  dim="2" count="4 4 1" spacing=".8 .8 .8" radius=".1"
+              mass="1"
               >
 
     <!-- <flexcomp name="trampoline1" pos="0 0 .1"
