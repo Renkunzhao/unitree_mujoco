@@ -44,13 +44,13 @@ link_libraries(
 
 add_executable(unitree_mujoco ${SIM_SRC} src/main.cc)
 target_link_libraries(unitree_mujoco ${SIM_DEPENDENCIES})
-find_package(logger QUIET)
-if(logger_FOUND)
-    message("Found logger")
-    target_link_libraries(unitree_mujoco logger::CsvLogger)
+find_package(legged_base QUIET)
+if(legged_base_FOUND)
+    message("Found legged_base logger support")
+    target_link_libraries(unitree_mujoco legged_base::legged_base)
     target_compile_definitions(unitree_mujoco PRIVATE LOGGER)
 else()
-    message("logger not found")
+    message("legged_base logger support not found")
 endif()
 
 add_executable(jstest src/joystick/jstest.cc src/joystick/joystick.cc)
