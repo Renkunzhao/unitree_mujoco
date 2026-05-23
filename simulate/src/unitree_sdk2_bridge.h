@@ -240,17 +240,41 @@ public:
                     flex_flag = false;
                 }
 
-                    Eigen::VectorXd foot_force(4), foot_pos(4), foot_vel(4);
+                    // go2
+                    // Eigen::VectorXd foot_force(4), foot_pos(4), foot_vel(4);
 
-                    for (int j = 0; j < 4; j++) {
-                        foot_pos[j] = mj_data_->sensordata[dim_motor_sensor_ + 48 + 3*j + 2] - foot_size - 2*mj_model_->flex_radius[0];
-                        foot_vel[j] = mj_data_->sensordata[dim_motor_sensor_ + 60 + 3*j + 2];
-                        foot_force[j] = - mj_data_->sensordata[dim_motor_sensor_ + 72 + 3*j + 2];
-                    }
+                    // for (int j = 0; j < 4; j++) {
+                    //     foot_pos[j] = mj_data_->sensordata[dim_motor_sensor_ + 48 + 3*j + 2] - foot_size - 2*mj_model_->flex_radius[0];
+                    //     foot_vel[j] = mj_data_->sensordata[dim_motor_sensor_ + 60 + 3*j + 2];
+                    //     foot_force[j] = - mj_data_->sensordata[dim_motor_sensor_ + 72 + 3*j + 2];
+                    // }
 
-                    csvLogger.update("foot_force", foot_force);
-                    csvLogger.update("foot_pos", foot_pos);
-                    csvLogger.update("foot_vel", foot_vel);
+                    // csvLogger.update("foot_force", foot_force);
+                    // csvLogger.update("foot_pos", foot_pos);
+                    // csvLogger.update("foot_vel", foot_vel);
+
+                    // // g1
+
+                    // Eigen::VectorXd foot_force(6);
+                    
+                    // int left_foot_force_adr_ = -1, right_foot_force_adr_ = -1;
+                    // int sensor_id = -1;
+
+                    // sensor_id = mj_name2id(mj_model_, mjOBJ_SENSOR, "left_foot_force");
+                    // if (sensor_id >= 0) {
+                    //     left_foot_force_adr_ = mj_model_->sensor_adr[sensor_id];
+                    // }
+
+                    // sensor_id = mj_name2id(mj_model_, mjOBJ_SENSOR, "right_foot_force");
+                    // if (sensor_id >= 0) {
+                    //     right_foot_force_adr_ = mj_model_->sensor_adr[sensor_id];
+                    // }
+
+                    // for (int j = 0; j < 3; j++) {
+                    //     foot_force[j] = mj_data_->sensordata[left_foot_force_adr_ + j];
+                    //     foot_force[j+3] = mj_data_->sensordata[right_foot_force_adr_ + j];
+                    // }
+                    // csvLogger.update("foot_force", foot_force);
                 }
             );
 
