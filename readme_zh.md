@@ -42,7 +42,8 @@
 
 ```bash
 sudo apt install libyaml-cpp-dev libboost-all-dev libglfw3-dev \
-  ros-jazzy-rclcpp ros-jazzy-rmw-cyclonedds-cpp
+  ros-jazzy-rclcpp ros-jazzy-sensor-msgs ros-jazzy-geometry-msgs \
+  ros-jazzy-tf2-ros ros-jazzy-rmw-cyclonedds-cpp
 ```
 
 工作区或 underlay 中必须提供 `unitree_ros2` 的 `unitree_go` 和 `unitree_hg` 消息包。
@@ -132,6 +133,29 @@ print_scene_information: 1
 # 主要用于模拟 H1 机器人初始化挂起的过程 
 enable_elastic_band: 0 # For H1 
 ```
+
+### ROS 2 深度相机
+
+C++ 仿真器可以发布与 `realsense-ros` 相同的校正后深度接口：
+
+- `/camera/camera/depth/image_rect_raw`：`sensor_msgs/msg/Image`，`16UC1`
+- `/camera/camera/depth/camera_info`：`sensor_msgs/msg/CameraInfo`
+- `/tf_static`：`base_link -> camera_link -> camera_depth_frame -> camera_depth_optical_frame`
+
+在 `simulate/config.yaml` 中设置 Go2 相机安装位姿以及 ROS frame/topic，在
+`simulate/camera_profiles.yaml` 中选择分辨率、帧率、深度单位和内参。内置的
+`calibrated_848x480_30` 是当前连接 D435I 报告的工厂标定参数。
+
+```bash
+cd /home/rkz/code/unitree_ws
+source src/unitree_lowlevel/scripts/setup.sh lo jazzy
+ros2 run unitree_mujoco unitree_mujoco \
+  -r go2 -s scene_bridge_ros_camera.xml --depth-camera
+```
+
+机器人 bridge 和相机共用一个 ROS 2 context。`ROS_DOMAIN_ID`、RMW 和网卡只由
+source 后的环境决定；以上命令使两者都在 domain 0、`lo` 网卡上使用 CycloneDDS。
+仿真器只发布深度流，不会伪造 D435I 的彩色、红外或 IMU 数据。
 
 ### python 仿真器
 python 仿真器的配置文件位于 `/simulate_python/config.py` 中：

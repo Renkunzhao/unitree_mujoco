@@ -41,7 +41,8 @@ Note:
 
 ```bash
 sudo apt install libyaml-cpp-dev libboost-all-dev libglfw3-dev \
-  ros-jazzy-rclcpp ros-jazzy-rmw-cyclonedds-cpp
+  ros-jazzy-rclcpp ros-jazzy-sensor-msgs ros-jazzy-geometry-msgs \
+  ros-jazzy-tf2-ros ros-jazzy-rmw-cyclonedds-cpp
 ```
 
 The `unitree_go` and `unitree_hg` message packages from `unitree_ros2` must be
@@ -133,6 +134,33 @@ print_scene_information: 1
 # Mainly used to simulate the hanging process of H1 robot initialization
 enable_elastic_band: 0 # For H1
 ```
+
+### ROS 2 depth camera
+
+The C++ simulator can publish the same rectified depth interface used by
+`realsense-ros`:
+
+- `/camera/camera/depth/image_rect_raw`: `sensor_msgs/msg/Image`, `16UC1`
+- `/camera/camera/depth/camera_info`: `sensor_msgs/msg/CameraInfo`
+- `/tf_static`: `base_link -> camera_link -> camera_depth_frame -> camera_depth_optical_frame`
+
+Set the Go2 mount and ROS frame/topic names in `simulate/config.yaml`. Camera
+resolution, frame rate, depth scale, and intrinsics are selected from
+`simulate/camera_profiles.yaml`. The included `calibrated_848x480_30` profile is
+the factory calibration reported by the connected D435I.
+
+```bash
+cd /home/rkz/code/unitree_ws
+source src/unitree_lowlevel/scripts/setup.sh lo jazzy
+ros2 run unitree_mujoco unitree_mujoco \
+  -r go2 -s scene_bridge_ros_camera.xml --depth-camera
+```
+
+The robot bridge and camera use the same ROS 2 context. `ROS_DOMAIN_ID`, RMW,
+and network selection come only from the sourced environment; with the setup
+above both use CycloneDDS on domain 0 and `lo`. The simulated sensor publishes
+the depth stream only; it does not fabricate D435I color, infrared, or IMU
+streams.
 
 ### Python Simulator
 The configuration file for the Python simulator is located at `/simulate_python/config.py`:

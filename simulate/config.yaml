@@ -9,3 +9,24 @@ joystick_bits: 16 # Some game controllers may only have 8-bit accuracy
 print_scene_information: 1 # Print link, joint and sensors information of robot
 
 enable_elastic_band: 0 # Virtual spring band, used for lifting h1
+
+depth_camera:
+  enabled: false
+  camera_name: "front_depth_camera"
+  parent_frame: "base_link"
+
+  # Pose of camera_link relative to the Go2 base_link.
+  mount:
+    position_m: [0.24, -0.0175, 0.12]
+    rpy_rad: [0.0, 0.4, 0.0]
+
+  sensor:
+    model: "d435i"
+    profile: "calibrated_640x480_30"
+
+  ros:
+    camera_link_frame_id: "camera_link"
+    depth_frame_id: "camera_depth_frame"
+    optical_frame_id: "camera_depth_optical_frame"
+    depth_topic: "/camera/camera/depth/image_rect_raw"
+    camera_info_topic: "/camera/camera/depth/camera_info"

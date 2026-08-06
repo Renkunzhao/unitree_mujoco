@@ -7,7 +7,11 @@ set(CMAKE_CXX_EXTENSIONS OFF)
 
 find_package(ament_cmake REQUIRED)
 find_package(ament_index_cpp REQUIRED)
+find_package(builtin_interfaces REQUIRED)
+find_package(geometry_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(sensor_msgs REQUIRED)
+find_package(tf2_ros REQUIRED)
 find_package(unitree_go REQUIRED)
 find_package(unitree_hg REQUIRED)
 
@@ -28,6 +32,7 @@ endif()
 
 add_executable(unitree_mujoco
   simulate/src/main.cc
+  simulate/src/depth_camera.cc
   simulate/src/ros2_bridge.cc
   simulate/src/joystick/joystick.cc
   simulate/src/lodepng/lodepng.cpp
@@ -44,7 +49,11 @@ target_include_directories(unitree_mujoco PRIVATE
 )
 ament_target_dependencies(unitree_mujoco
   ament_index_cpp
+  builtin_interfaces
+  geometry_msgs
   rclcpp
+  sensor_msgs
+  tf2_ros
   unitree_go
   unitree_hg
 )
@@ -70,6 +79,7 @@ install(TARGETS unitree_mujoco jstest
 )
 install(FILES
   simulate/config.yaml
+  simulate/camera_profiles.yaml
   DESTINATION share/${PROJECT_NAME}/config
 )
 install(DIRECTORY unitree_robots/

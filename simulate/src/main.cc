@@ -38,6 +38,7 @@
 #include <rclcpp/rclcpp.hpp>
 #include "simulate.h"
 #include "array_safety.h"
+#include "depth_camera.h"
 #include "param.h"
 #include "ros2_bridge.h"
 
@@ -108,7 +109,9 @@ namespace
   mjtNum *ctrlnoise = nullptr;
 
   rclcpp::Node::SharedPtr robot_node;
+  rclcpp::Node::SharedPtr camera_node;
   std::unique_ptr<Ros2BridgeBase> robot_bridge;
+  std::unique_ptr<DepthCameraPublisher> depth_camera;
   std::atomic_bool physics_failed{false};
 
   using Seconds = std::chrono::duration<double>;
@@ -313,13 +316,27 @@ namespace
       }
     }
 
-    mju::strcpy_arr(sim.load_error, loadError);
-
     if (!mnew)
     {
+      mju::strcpy_arr(sim.load_error, loadError);
       std::printf("%s\n", loadError);
       return nullptr;
     }
+
+    if (depth_camera)
+    {
+      std::string camera_error;
+      if (!depth_camera->ConfigureModel(mnew, &camera_error))
+      {
+        mju::strcpy_arr(loadError, camera_error.c_str());
+        mju::strcpy_arr(sim.load_error, loadError);
+        std::fprintf(stderr, "Depth camera configuration failed: %s\n", loadError);
+        mj_deleteModel(mnew);
+        return nullptr;
+      }
+    }
+
+    mju::strcpy_arr(sim.load_error, loadError);
 
     // compiler warning: print and pause
     if (loadError[0])
@@ -563,6 +580,10 @@ namespace
             if (stepped)
             {
               sim.AddToHistory();
+              if (depth_camera)
+              {
+                depth_camera->CaptureIfDue(d);
+              }
             }
           }
 
@@ -578,6 +599,10 @@ namespace
             if (robot_bridge)
             {
               robot_bridge->CaptureState();
+            }
+            if (depth_camera)
+            {
+              depth_camera->CaptureIfDue(d);
             }
             sim.speed_changed = true;
           }
@@ -629,6 +654,16 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
         sim->exitrequest.store(true);
       }
 
+      if (!sim->exitrequest.load() && depth_camera)
+      {
+        std::string camera_error;
+        if (!depth_camera->Start(m, &camera_error))
+        {
+          std::fprintf(stderr, "Failed to start depth camera: %s\n", camera_error.c_str());
+          physics_failed.store(true);
+          sim->exitrequest.store(true);
+        }
+      }
     }
     else
     {
@@ -643,6 +678,11 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
   // delete everything we allocated
   sim->exitrequest.store(true);
   const std::unique_lock<std::recursive_mutex> lock(sim->mtx);
+  if (depth_camera)
+  {
+    depth_camera->Stop();
+    depth_camera.reset();
+  }
   free(ctrlnoise);
   ctrlnoise = nullptr;
   mj_deleteData(d);
@@ -731,7 +771,7 @@ int main(int argc, char **argv)
     arguments = rclcpp::init_and_remove_ros_arguments(argc, argv);
     const auto share_directory = std::filesystem::path(
         ament_index_cpp::get_package_share_directory("unitree_mujoco"));
-    param::config.load_from_yaml((share_directory / "config" / "config.yaml").string());
+    param::config.load_from_yaml(share_directory / "config" / "config.yaml");
 
     std::vector<char*> argument_pointers;
     argument_pointers.reserve(arguments.size());
@@ -747,6 +787,13 @@ int main(int argc, char **argv)
     }
 
     robot_node = std::make_shared<rclcpp::Node>("unitree_mujoco");
+    if (param::config.depth_camera.enabled)
+    {
+      const auto camera_options = rclcpp::NodeOptions().use_global_arguments(false);
+      camera_node = std::make_shared<rclcpp::Node>("camera", "/camera", camera_options);
+      depth_camera =
+          std::make_unique<DepthCameraPublisher>(camera_node, param::config.depth_camera);
+    }
   }
   catch (const std::exception& error)
   {
@@ -760,6 +807,10 @@ int main(int argc, char **argv)
 
   rclcpp::executors::SingleThreadedExecutor executor;
   executor.add_node(robot_node);
+  if (camera_node)
+  {
+    executor.add_node(camera_node);
+  }
   std::thread executor_thread([&executor]() { executor.spin(); });
 
   // simulate object encapsulates the UI
@@ -782,6 +833,7 @@ int main(int argc, char **argv)
   }
   executor_thread.join();
   robot_bridge.reset();
+  camera_node.reset();
   robot_node.reset();
   return physics_failed.load() ? EXIT_FAILURE : EXIT_SUCCESS;
 }

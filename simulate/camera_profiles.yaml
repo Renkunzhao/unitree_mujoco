@@ -1,0 +1,28 @@
+# Factory calibration reported by the connected D435I (serial 244222073001).
+# image_rect_raw is rectified, so its distortion coefficients are zero.
+models:
+  d435i:
+    profiles:
+      calibrated_848x480_30:
+        width: 848
+        height: 480
+        fps: 30.0
+        depth_scale_m: 0.001
+        fx: 430.2142028808594
+        fy: 430.2142028808594
+        cx: 427.59716796875
+        cy: 237.16070556640625
+        distortion_model: "plumb_bob"
+        distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+      calibrated_640x480_30:
+        width: 640
+        height: 480
+        fps: 30.0
+        depth_scale_m: 0.001
+        fx: 389.627960205078
+        fy: 389.627960205078
+        cx: 323.2578125
+        cy: 237.428558349609
+        distortion_model: "plumb_bob"
+        distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
