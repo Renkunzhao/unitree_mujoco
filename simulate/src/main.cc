@@ -20,6 +20,7 @@
 #undef protected
 
 #include <chrono>
+#include <atomic>
 #include <cstdint>
 #include <cstdio>
 #include <cstdlib>
@@ -30,16 +31,17 @@
 #include <new>
 #include <string>
 #include <thread>
+#include <vector>
 
+#include <ament_index_cpp/get_package_share_directory.hpp>
 #include <mujoco/mujoco.h>
+#include <rclcpp/rclcpp.hpp>
 #include "simulate.h"
 #include "array_safety.h"
-#include "unitree_sdk2_bridge.h"
 #include "param.h"
+#include "ros2_bridge.h"
 
 #define MUJOCO_PLUGIN_DIR "mujoco_plugin"
-#define NUM_MOTOR_IDL_GO 20
-
 extern "C"
 {
 #if defined(_WIN32) || defined(__CYGWIN__)
@@ -104,6 +106,10 @@ namespace
 
   // control noise variables
   mjtNum *ctrlnoise = nullptr;
+
+  rclcpp::Node::SharedPtr robot_node;
+  std::unique_ptr<Ros2BridgeBase> robot_bridge;
+  std::atomic_bool physics_failed{false};
 
   using Seconds = std::chrono::duration<double>;
 
@@ -333,13 +339,15 @@ namespace
     std::chrono::time_point<mj::Simulate::Clock> syncCPU;
     mjtNum syncSim = 0;
 
-    // ChannelFactory::Instance()->Init(0);
-    // UnitreeDds ud(d);
-
     // run until asked to exit
-    while (!sim.exitrequest.load())
+    while (!sim.exitrequest.load() && rclcpp::ok())
     {
-      if (sim.droploadrequest.load())
+      if (sim.droploadrequest.load() && robot_bridge)
+      {
+        std::fprintf(stderr, "Runtime model reload is disabled while the ROS 2 bridge is active.\n");
+        sim.droploadrequest.store(false);
+      }
+      else if (sim.droploadrequest.load())
       {
         sim.LoadMessage(sim.dropfilename);
         mjModel *mnew = LoadModel(sim.dropfilename, sim);
@@ -370,7 +378,12 @@ namespace
         }
       }
 
-      if (sim.uiloadrequest.load())
+      if (sim.uiloadrequest.load() && robot_bridge)
+      {
+        std::fprintf(stderr, "Runtime model reload is disabled while the ROS 2 bridge is active.\n");
+        sim.uiloadrequest.store(0);
+      }
+      else if (sim.uiloadrequest.load())
       {
         sim.uiloadrequest.fetch_sub(1);
         sim.LoadMessage(sim.filename);
@@ -442,8 +455,6 @@ namespace
                 // update noise
                 ctrlnoise[i] = rate * ctrlnoise[i] + scale * mju_standardNormal(nullptr);
 
-                // apply noise
-                d->ctrl[i] = ctrlnoise[i];
               }
             }
 
@@ -463,8 +474,24 @@ namespace
               syncSim = d->time;
               sim.speed_changed = false;
 
+              if (robot_bridge)
+              {
+                robot_bridge->ApplyCommand();
+              }
+              if (sim.ctrl_noise_std)
+              {
+                for (int i = 0; i < m->nu; ++i)
+                {
+                  d->ctrl[i] += ctrlnoise[i];
+                }
+              }
+
               // run single step, let next iteration deal with timing
               mj_step(m, d);
+              if (robot_bridge)
+              {
+                robot_bridge->CaptureState();
+              }
               stepped = true;
             }
 
@@ -504,8 +531,24 @@ namespace
                   }
                 }
 
+                if (robot_bridge)
+                {
+                  robot_bridge->ApplyCommand();
+                }
+                if (sim.ctrl_noise_std)
+                {
+                  for (int i = 0; i < m->nu; ++i)
+                  {
+                    d->ctrl[i] += ctrlnoise[i];
+                  }
+                }
+
                 // call mj_step
                 mj_step(m, d);
+                if (robot_bridge)
+                {
+                  robot_bridge->CaptureState();
+                }
                 stepped = true;
 
                 // break if reset
@@ -527,7 +570,15 @@ namespace
           else
           {
             // run mj_forward, to update rendering and joint sliders
+            if (robot_bridge)
+            {
+              robot_bridge->ApplyCommand();
+            }
             mj_forward(m, d);
+            if (robot_bridge)
+            {
+              robot_bridge->CaptureState();
+            }
             sim.speed_changed = true;
           }
         }
@@ -556,57 +607,48 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
       free(ctrlnoise);
       ctrlnoise = static_cast<mjtNum *>(malloc(sizeof(mjtNum) * m->nu));
       mju_zero(ctrlnoise, m->nu);
+
+      try
+      {
+        int body_id = mj_name2id(m, mjOBJ_BODY, "torso_link");
+        if (body_id < 0)
+        {
+          body_id = mj_name2id(m, mjOBJ_BODY, "base_link");
+        }
+        if (body_id < 0)
+        {
+          throw std::runtime_error("MuJoCo model has neither torso_link nor base_link");
+        }
+        param::config.band_attached_link = 6 * body_id;
+        robot_bridge = CreateRos2Bridge(robot_node, m, d);
+      }
+      catch (const std::exception& error)
+      {
+        std::fprintf(stderr, "Failed to start ROS 2 robot bridge: %s\n", error.what());
+        physics_failed.store(true);
+        sim->exitrequest.store(true);
+      }
+
     }
     else
     {
       sim->LoadMessageClear();
+      physics_failed.store(true);
+      sim->exitrequest.store(true);
     }
   }
 
   PhysicsLoop(*sim);
 
   // delete everything we allocated
+  sim->exitrequest.store(true);
+  const std::unique_lock<std::recursive_mutex> lock(sim->mtx);
   free(ctrlnoise);
+  ctrlnoise = nullptr;
   mj_deleteData(d);
   mj_deleteModel(m);
-
-  exit(0);
-}
-
-void *UnitreeSdk2BridgeThread(void *arg)
-{
-  // Wait for mujoco data
-  while (true)
-  {
-    if (d)
-    {
-      std::cout << "Mujoco data is prepared" << std::endl;
-      break;
-    }
-    usleep(500000);
-  }
-
-  unitree::robot::ChannelFactory::Instance()->Init(param::config.domain_id, param::config.interface);
-
-
-  int body_id = mj_name2id(m, mjOBJ_BODY, "torso_link");
-  if (body_id < 0) {
-    body_id = mj_name2id(m, mjOBJ_BODY, "base_link");
-  }
-  param::config.band_attached_link = 6 * body_id;
-  
-  std::unique_ptr<UnitreeSDK2BridgeBase> interface = nullptr;
-  if (m->nu > NUM_MOTOR_IDL_GO) {
-    interface = std::make_unique<G1Bridge>(m, d);
-  } else {
-    interface = std::make_unique<Go2Bridge>(m, d);
-  }
-  interface->start();
-  
-  while (true)
-  {
-    sleep(1);
-  }
+  d = nullptr;
+  m = nullptr;
 }
 //------------------------------------------ main --------------------------------------------------
 
@@ -633,7 +675,7 @@ void user_key_cb(GLFWwindow* window, int key, int scancode, int act, int mods) {
         elastic_band.length_ += 0.1;
       }
     }
-    if(key==GLFW_KEY_BACKSPACE) {
+    if(key==GLFW_KEY_BACKSPACE && m && d) {
       mj_resetData(m, d);
       mj_forward(m, d);
     }
@@ -655,7 +697,6 @@ void user_key_cb(GLFWwindow* window, int key, int scancode, int act, int mods) {
 // run event loop
 int main(int argc, char **argv)
 {
-
   // display an error if running on macOS under Rosetta 2
 #if defined(__APPLE__) && defined(__AVX__)
   if (rosetta_error_msg)
@@ -684,28 +725,63 @@ int main(int argc, char **argv)
   mjvPerturb pert;
   mjv_defaultPerturb(&pert);
 
-  // Load simulation configuration
-  std::filesystem::path proj_dir = std::filesystem::path(getExecutableDir()).parent_path();
-  param::config.load_from_yaml(proj_dir / "config.yaml");
-  param::helper(argc, argv);
-  if(param::config.robot_scene.is_relative()) {
-    param::config.robot_scene = proj_dir.parent_path() / "unitree_robots" / param::config.robot / param::config.robot_scene;
+  std::vector<std::string> arguments;
+  try
+  {
+    arguments = rclcpp::init_and_remove_ros_arguments(argc, argv);
+    const auto share_directory = std::filesystem::path(
+        ament_index_cpp::get_package_share_directory("unitree_mujoco"));
+    param::config.load_from_yaml((share_directory / "config" / "config.yaml").string());
+
+    std::vector<char*> argument_pointers;
+    argument_pointers.reserve(arguments.size());
+    for (auto& argument : arguments)
+    {
+      argument_pointers.push_back(argument.data());
+    }
+    param::helper(static_cast<int>(argument_pointers.size()), argument_pointers.data());
+    if (param::config.robot_scene.is_relative())
+    {
+      param::config.robot_scene = share_directory / "unitree_robots" /
+                                  param::config.robot / param::config.robot_scene;
+    }
+
+    robot_node = std::make_shared<rclcpp::Node>("unitree_mujoco");
   }
+  catch (const std::exception& error)
+  {
+    std::fprintf(stderr, "Failed to initialize unitree_mujoco: %s\n", error.what());
+    if (rclcpp::ok())
+    {
+      rclcpp::shutdown();
+    }
+    return EXIT_FAILURE;
+  }
+
+  rclcpp::executors::SingleThreadedExecutor executor;
+  executor.add_node(robot_node);
+  std::thread executor_thread([&executor]() { executor.spin(); });
 
   // simulate object encapsulates the UI
   auto sim = std::make_unique<mj::Simulate>(
     std::make_unique<mj::GlfwAdapter>(),
     &cam, &opt, &pert, /* is_passive = */ false);
 
-  std::thread unitree_thread(UnitreeSdk2BridgeThread, nullptr);
-
   // start physics thread
   std::thread physicsthreadhandle(&PhysicsThread, sim.get(), param::config.robot_scene.c_str());
   // start simulation UI loop (blocking call)
   glfwSetKeyCallback(static_cast<mj::GlfwAdapter*>(sim->platform_ui.get())->window_,user_key_cb);
   sim->RenderLoop();
+  sim->exitrequest.store(true);
   physicsthreadhandle.join();
 
-  pthread_exit(NULL);
-  return 0;
+  executor.cancel();
+  if (rclcpp::ok())
+  {
+    rclcpp::shutdown();
+  }
+  executor_thread.join();
+  robot_bridge.reset();
+  robot_node.reset();
+  return physics_failed.load() ? EXIT_FAILURE : EXIT_SUCCESS;
 }

@@ -1,21 +1,23 @@
 # Introduction
 ## Unitree mujoco
-`unitree_mujoco` is a simulator developed based on `Unitree sdk2` and `mujoco`. Users can easily integrate the control programs developed with `Unitree_sdk2`, `unitree_ros2`, and `unitree_sdk2_python` into this simulator, enabling a seamless transition from simulation to physical development. The repository includes two versions of the simulator implemented in C++ and Python, with a structure as follows:
+`unitree_mujoco` is a MuJoCo simulator for Unitree robots. The C++ simulator is a native ROS 2 package and publishes the same `unitree_go` or `unitree_hg` topics used by the hardware. The Python simulator continues to use `unitree_sdk2_python`.
 ![](./doc/func.png)
 
 ## Directory Structure
-- `simulate`: Simulator implemented based on unitree_sdk2 and mujoco (C++, recommended)
+- `simulate`: Native ROS 2 and MuJoCo simulator (C++, recommended)
 - `simulate_python`: Simulator implemented based on unitree_sdk2_python and mujoco (Python)
 - `unitree_robots`: MJCF description files for robots supported by unitree_sdk2
 - `terrain_tool`: Tool for generating terrain in simulation scenarios
 - `example`: Example programs
 
-## Supported Unitree sdk2 Messages:
+## Supported ROS 2 interfaces
 **Current version only supports low-level development, mainly used for sim to real verification of controller**
-- `LowCmd`: Motor control commands
-- `LowState`: Motor state information
-- `SportModeState`: Robot position and velocity data
-- `IMUState`: Torso IMU state at `rt/secondary_imu` topic (G1 only)
+- `/lowcmd`: Motor control commands
+- `/lowstate`: Motor state information
+- `/sportmodestate`: Robot position and velocity data
+- `/wirelesscontroller`: Simulated Unitree gamepad state
+- `/secondary_imu`: Torso IMU state (G1 only)
+- `/lf/bmsstate`: Battery state (G1 only)
 
 Note:
 1. The numbering of the motors corresponds to the actual robot hardware. Specific details can be found in the [Unitree documentation](https://support.unitree.com/home/zh/developer).
@@ -38,20 +40,13 @@ Note:
 ### 1. Dependencies
 
 ```bash
-sudo apt install libyaml-cpp-dev libspdlog-dev libboost-all-dev libglfw3-dev
+sudo apt install libyaml-cpp-dev libboost-all-dev libglfw3-dev \
+  ros-jazzy-rclcpp ros-jazzy-rmw-cyclonedds-cpp
 ```
 
-#### unitree_sdk2
-It is recommended to install `unitree_sdk2` in `/opt/unitree_robotics` path.
-```bash
-git clone https://github.com/unitreerobotics/unitree_sdk2.git
-cd unitree_sdk2/
-mkdir build
-cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=/opt/unitree_robotics
-sudo make install
-```
-For more details, see: https://github.com/unitreerobotics/unitree_sdk2
+The `unitree_go` and `unitree_hg` message packages from `unitree_ros2` must be
+available in the same workspace or an underlay.
+
 #### mujoco
 
 Download the mujoco [release](https://github.com/google-deepmind/mujoco/releases), and extract it to the `~/.mujoco` directory;
@@ -63,24 +58,18 @@ ln -s ~/.mujoco/mujoco-3.3.6 mujoco
 
 ### 2. Compile unitree_mujoco
 ```bash
-cd unitree_mujoco/simulate
-mkdir build && cd build
-cmake ..
-make -j4
+cd /path/to/unitree_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install --packages-select unitree_mujoco
+source install/setup.bash
 ```
 ### 3. Test:
 Run:
 ```bash
-./unitree_mujoco -r go2 -s scene_terrain.xml
+source src/unitree_lowlevel/scripts/setup.sh lo jazzy
+ros2 run unitree_mujoco unitree_mujoco -r go2 -s scene_terrain.xml
 ```
 You should see the mujoco simulator with the Go2 robot loaded.
-In a new terminal, run:
-```bash
-./test
-```
-The program will output the robot's pose and position information in the simulator, and each motor of the robot will continuously output 1Nm of torque.
-
-**Note:** The testing program sends the unitree_go message. If you want to test G1 robot, you need to modify the program to use the unitree_hg message.
 
 ## Python Simulator (simulate_python)
 ### 1. Dependencies
@@ -133,22 +122,18 @@ robot: "go2"
 # Robot simulation scene file
 # For example, for go2, it refers to the scene.xml file in the /unitree_robots/go2/ folder
 robot_scene: "scene.xml"
-# DDS domain id, it is recommended to distinguish from the real robot (default is 0 on the real robot)
-domain_id: 1
-
 use_joystick: 1 # Simulate Unitree WirelessController using a gamepad
 joystick_type: "xbox" # support "xbox" and "switch" gamepad layout
 joystick_device: "/dev/input/js0" # Device path
 joystick_bits: 16 # Some game controllers may only have 8-bit accuracy
 
-# Network interface name, for simulation, it is recommended to use the local loopback "lo"
-interface: "lo"
 # Whether to output robot link, joint, sensor information, 1 for output
 print_scene_information: 1
 # Whether to use virtual tape, 1 to enable
 # Mainly used to simulate the hanging process of H1 robot initialization
 enable_elastic_band: 0 # For H1
 ```
+
 ### Python Simulator
 The configuration file for the Python simulator is located at `/simulate_python/config.py`:
 ```python
@@ -178,9 +163,9 @@ SIMULATE_DT = 0.003
 VIEWER_DT = 0.02
 ```
 ### Joystick
-The simulator will use an Xbox or Switch gamepad  to simulate the wireless controller of the robot. The button and joystick information of the wireless controller will be published through "rt/wireless_controller" topic. `use_joystick/USE_JOYSTICK` in `config.yaml/config.py` needs to be set to 0, when there is no gamepad. If your gamepad is not in Xbox or Switch layout, you can modify it in the source code (The button and joystick IDs can be  determined  using `jstest`):
+The simulator will use an Xbox or Switch gamepad to simulate the wireless controller of the robot. The C++ simulator publishes it on `/wirelesscontroller`. `use_joystick/USE_JOYSTICK` in `config.yaml/config.py` needs to be set to 0 when there is no gamepad. If your gamepad is not in Xbox or Switch layout, modify the mapping in the source code (button and joystick IDs can be determined using `jstest`):
 
-In `simulate/src/unitree_sdk2_bridge/unitree_sdk2_bridge.cc`: 
+In `simulate/src/physics_joystick.h`:
 ```C++
  if (js_type == "xbox")
 {

@@ -1,23 +1,25 @@
 
 # 介绍
 ## Unitree mujoco
-`unitree_mujoco` 是基于 `Unitree sdk2` 和 `mujoco` 开发的仿真器。用户使用 `Unitree_sdk2`、 `unitree_ros2` 和 `unitree_sdk2_python` 开发的控制程序可以方便地接入该仿真器，实现仿真到实物的开发流程。仓库别基于 c++ 和 python 实现了两个版本的仿真器， 其结构大致如下图所示:
+`unitree_mujoco` 是 Unitree 机器人的 MuJoCo 仿真器。C++ 仿真器现在是标准 ROS 2 包，直接发布与真机一致的 `unitree_go` 或 `unitree_hg` topic；Python 仿真器仍使用 `unitree_sdk2_python`。
 
 ![](./doc/func.png)
 
 ## 目录结构
-- `simulate`: 基于 unitree_sdk2 和 mujoco (c++) 实现的仿真器（推荐）
+- `simulate`: 基于 ROS 2 和 MuJoCo 的 C++ 仿真器（推荐）
 - `simulate_python`: 基于 unitree_sdk2py 和 mujoco (python) 实现的仿真器
 - `unitree_robots`: unitree_sdk2 支持的机器人 mjcf 描述文件
 - `terrain_tool`: 仿真场景地形生成工具
 - `example`: 例程
 
-## 支持的 Unitree sdk2 消息：
+## 支持的 ROS 2 接口
 **当前版本仅支持底层开发，主要用于控制器的 sim to real 验证**
-- `LowCmd`: 电机控制指令
-- `LowState`：电机状态
-- `SportModeState`：机器人位置和速度
-- `IMUState`: 胸部IMU数据，话题为 `rt/secondary` (仅 G1)
+- `/lowcmd`：电机控制指令
+- `/lowstate`：电机状态
+- `/sportmodestate`：机器人位置和速度
+- `/wirelesscontroller`：仿真 Unitree 手柄状态
+- `/secondary_imu`：胸部 IMU 数据（仅 G1）
+- `/lf/bmsstate`：电池状态（仅 G1）
 
 ## 消息(DDS idl)类型说明
 - Unitree Go2, B2, H1, B2w, Go2w 型号的机器人使用 unitree_go idl 实现底层通信
@@ -39,20 +41,12 @@
 ### 1. 依赖
 
 ```bash
-sudo apt install libyaml-cpp-dev libspdlog-dev libboost-all-dev libglfw3-dev
+sudo apt install libyaml-cpp-dev libboost-all-dev libglfw3-dev \
+  ros-jazzy-rclcpp ros-jazzy-rmw-cyclonedds-cpp
 ```
 
-#### unitree_sdk2
-推荐将 `unitree_sdk2` 安装在 `/opt/unitree_robotics` 路径下。
-```bash
-git clone https://github.com/unitreerobotics/unitree_sdk2.git
-cd unitree_sdk2/
-mkdir build
-cd build
-cmake .. -DCMAKE_INSTALL_PREFIX=/opt/unitree_robotics
-sudo make install
-```
-详细见：https://github.com/unitreerobotics/unitree_sdk2
+工作区或 underlay 中必须提供 `unitree_ros2` 的 `unitree_go` 和 `unitree_hg` 消息包。
+
 #### mujoco
 
 下载mujoco[安装包](https://github.com/google-deepmind/mujoco/releases), 解压到 `~/.mujoco` 目录下;
@@ -64,26 +58,19 @@ ln -s ~/.mujoco/mujoco-3.3.6 mujoco
 
 ### 2. 编译 unitree_mujoco
 ```
-cd unitree_mujoco/simulate/
-mkdir build && cd build
-cmake ..
-make -j4
+cd /path/to/unitree_ws
+source /opt/ros/jazzy/setup.bash
+colcon build --symlink-install --packages-select unitree_mujoco
+source install/setup.bash
 ```
 
 ### 3. 测试:
 运行：
 ```bash
-./unitree_mujoco -r go2 -s scene_terrain.xml
+source src/unitree_lowlevel/scripts/setup.sh lo jazzy
+ros2 run unitree_mujoco unitree_mujoco -r go2 -s scene_terrain.xml
 ```
 可以看到加载了 Go2 机器人的 mujoco 仿真器。
-
-在新的终端中运行：
-```
-./test
-```
-程序会输出机器人在仿真器中的姿态和位置信息，同时机器人的每个电机都会持续输出 1Nm 的转矩。
-
-**注：** 测试程序发送的是 unitree_go 消息，如果需要测试 G1 机器人，需要修改程序使用 unitree_hg 消息。
 
 ## Python 仿真器 (simulate_python)
 ### 1. 依赖
@@ -138,11 +125,6 @@ robot: "go2"
 # 以 go2 为例，指的是/unitree_robots/go2/文件夹下的 scene.xml 文件
 robot_scene: "scene.xml" 
 
-# dds domain id，最好与实物(实物上默认为 0)区分开
-domain_id: 1 
-# 网卡名称, 对于仿真建议使用本地回环 "lo"
-interface: "lo"
-
 # 是否输出机器人连杆、关节、传感器等信息，1为输出
 print_scene_information: 1
 
@@ -150,6 +132,7 @@ print_scene_information: 1
 # 主要用于模拟 H1 机器人初始化挂起的过程 
 enable_elastic_band: 0 # For H1 
 ```
+
 ### python 仿真器
 python 仿真器的配置文件位于 `/simulate_python/config.py` 中：
 ```python
@@ -185,9 +168,9 @@ VIEWER_DT = 0.02
 ```
 
 ### 游戏手柄
-仿真器会使用 Xbox 或者 Switch 游戏来模拟机器人的无线控制器，并将手柄按键和摇杆信息发布在"rt/wireless_controller" topic。如果手上没有可以使用的游戏手柄，需要将 `config.yaml/config.py` 中的 `use_joystick/USE_JOYSTICK` 设置为 0。如果使用的手柄不属于 Xbox 和 Switch 映射，可以在源码中自行修改或添加(可以使用 `jstest` 工具查看按键和摇杆 id)：
+仿真器会使用 Xbox 或 Switch 手柄模拟机器人的无线控制器，C++ 仿真器将其发布到 `/wirelesscontroller`。没有手柄时，需要将 `config.yaml/config.py` 中的 `use_joystick/USE_JOYSTICK` 设置为 0。如果手柄不属于 Xbox 或 Switch 映射，可以在源码中修改映射（可使用 `jstest` 查看按键和摇杆 id）：
 
-In `simulate/src/unitree_sdk2_bridge/unitree_sdk2_bridge.cc`: 
+在 `simulate/src/physics_joystick.h` 中：
 ```C++
  if (js_type == "xbox")
 {

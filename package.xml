@@ -1,0 +1,22 @@
+<?xml version="1.0"?>
+<package format="3">
+  <name>unitree_mujoco</name>
+  <version>0.1.0</version>
+  <description>MuJoCo simulation with native Unitree ROS 2 low-level topics.</description>
+  <maintainer email="rkzdtc@gmail.com">Kunzhao Ren</maintainer>
+  <license>BSD-3-Clause</license>
+
+  <buildtool_depend>ament_cmake</buildtool_depend>
+
+  <depend>ament_index_cpp</depend>
+  <depend>rclcpp</depend>
+  <depend>unitree_go</depend>
+  <depend>unitree_hg</depend>
+  <depend>boost</depend>
+  <depend>libglfw3-dev</depend>
+  <depend>yaml-cpp</depend>
+
+  <export>
+    <build_type>ament_cmake</build_type>
+  </export>
+</package>
