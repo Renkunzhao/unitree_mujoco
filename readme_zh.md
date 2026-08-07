@@ -138,13 +138,19 @@ enable_elastic_band: 0 # For H1
 
 C++ 仿真器可以发布与 `realsense-ros` 相同的校正后深度接口：
 
-- `/camera/camera/depth/image_rect_raw`：`sensor_msgs/msg/Image`，`16UC1`
-- `/camera/camera/depth/camera_info`：`sensor_msgs/msg/CameraInfo`
+- `/camera/depth/image_rect_raw`：`sensor_msgs/msg/Image`，`16UC1`
+- `/camera/depth/camera_info`：`sensor_msgs/msg/CameraInfo`
 - `/tf_static`：`base_link -> camera_link -> camera_depth_frame -> camera_depth_optical_frame`
 
 在 `simulate/config.yaml` 中设置 Go2 相机安装位姿以及 ROS frame/topic，在
-`simulate/camera_profiles.yaml` 中选择分辨率、帧率、深度单位和内参。内置的
-`calibrated_848x480_30` 是当前连接 D435I 报告的工厂标定参数。
+`simulate/camera_profiles.yaml` 中选择分辨率、帧率、深度单位和内参。`mount`
+表示 `camera_link` 相对 `base_link` 的位姿。当前选择的
+`calibrated_640x480_30` 视场为 `78.79 x 63.26` 度。设置 `exclude_self: true` 可从深度图中排除 Go2 的视觉和碰撞几何。
+
+<!-- https://realsenseai.com/wp-content/uploads/2025/09/Intel-RealSense-D400-Series-Datasheet-October-2025.pdf P68 Table 3-52 -->
+启用深度相机后，主视窗会在配置的 mount 位姿中心显示一个无碰撞的
+`90 x 25 x 25 mm` D435I 参考 box。该 box 不会出现在传感器图像中，也不会把
+datasheet 中标称的 `75 g` 质量加入 Go2 动力学。
 
 ```bash
 cd /home/rkz/code/unitree_ws

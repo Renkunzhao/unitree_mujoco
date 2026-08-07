@@ -51,6 +51,7 @@ struct CameraRosConfig
 struct DepthCameraConfig
 {
     bool enabled = false;
+    bool exclude_self = false;
     std::string camera_name;
     std::string parent_frame;
     CameraMountConfig mount;
@@ -113,6 +114,7 @@ inline struct SimulationConfig
 
             const auto camera = cfg["depth_camera"];
             depth_camera.enabled = camera["enabled"].as<bool>();
+            depth_camera.exclude_self = camera["exclude_self"].as<bool>();
             depth_camera.camera_name = camera["camera_name"].as<std::string>();
             depth_camera.parent_frame = camera["parent_frame"].as<std::string>();
             depth_camera.mount.position_m =

@@ -31,6 +31,10 @@
 namespace
 {
 constexpr double kPi = 3.14159265358979323846;
+constexpr int kCameraVisualGeomGroup = 1;
+// D435/D435i nominal depth, width, and height: 25 x 90 x 25 mm.
+constexpr std::array<mjtNum, 3> kD435iHalfSizeM{0.0125, 0.045, 0.0125};
+constexpr std::array<float, 4> kD435iRgba{0.05f, 0.75f, 0.95f, 1.0f};
 
 std::array<mjtNum, 4> QuaternionFromRpy(const std::array<double, 3>& rpy)
 {
@@ -94,7 +98,18 @@ bool DepthCameraPublisher::ConfigureModel(mjModel* model, std::string* error)
     return false;
   }
 
+  const std::string visual_name = config_.camera_name + "_visual";
+  const int visual_id = mj_name2id(model, mjOBJ_GEOM, visual_name.c_str());
+  if (visual_id < 0 || model->geom_bodyid[visual_id] != parent_id ||
+      model->geom_type[visual_id] != mjGEOM_BOX)
+  {
+    *error = "camera visual '" + visual_name + "' must be a box geom attached directly to " +
+             config_.parent_frame;
+    return false;
+  }
+
   const auto mount_quaternion = QuaternionFromRpy(config_.mount.rpy_rad);
+  model->geom_sameframe[visual_id] = mjSAMEFRAME_NONE;
 
   // MuJoCo camera frame: +X right, +Y up, -Z forward.
   // ROS camera_link frame: +X forward, +Y left, +Z up.
@@ -110,10 +125,23 @@ bool DepthCameraPublisher::ConfigureModel(mjModel* model, std::string* error)
   for (int i = 0; i < 4; ++i)
   {
     model->cam_quat[4 * camera_id + i] = mujoco_quaternion[i];
+    model->geom_quat[4 * visual_id + i] = mount_quaternion[i];
+    model->geom_rgba[4 * visual_id + i] = kD435iRgba[i];
+  }
+  for (int i = 0; i < 3; ++i)
+  {
+    model->geom_pos[3 * visual_id + i] = config_.mount.position_m[i];
+    model->geom_size[3 * visual_id + i] = kD435iHalfSizeM[i];
   }
 
   const auto& profile = config_.profile;
   const auto& intrinsics = profile.intrinsics;
+  const double horizontal_fov =
+      std::atan(intrinsics.cx / intrinsics.fx) +
+      std::atan((profile.width - intrinsics.cx) / intrinsics.fx);
+  const double vertical_fov =
+      std::atan(intrinsics.cy / intrinsics.fy) +
+      std::atan((profile.height - intrinsics.cy) / intrinsics.fy);
   model->cam_resolution[2 * camera_id] = profile.width;
   model->cam_resolution[2 * camera_id + 1] = profile.height;
   model->cam_sensorsize[2 * camera_id] = 1.0f;
@@ -132,13 +160,16 @@ bool DepthCameraPublisher::ConfigureModel(mjModel* model, std::string* error)
 
   RCLCPP_INFO(
       node_->get_logger(),
-      "Configured %s with %s/%s: %dx%d at %.1f Hz, fx=%.6f fy=%.6f cx=%.6f cy=%.6f",
+      "Configured %s with %s/%s: %dx%d at %.1f Hz, FOV %.2f x %.2f deg, "
+      "fx=%.6f fy=%.6f cx=%.6f cy=%.6f",
       config_.camera_name.c_str(),
       config_.model.c_str(),
       config_.profile_name.c_str(),
       profile.width,
       profile.height,
       profile.fps,
+      horizontal_fov * 180.0 / kPi,
+      vertical_fov * 180.0 / kPi,
       intrinsics.fx,
       intrinsics.fy,
       intrinsics.cx,
@@ -369,6 +400,11 @@ void DepthCameraPublisher::RenderingLoop()
   mjr_defaultContext(&render_context_);
 
   render_option_.flags[mjVIS_RANGEFINDER] = 0;
+  render_option_.geomgroup[kCameraVisualGeomGroup] = 0;
+  if (config_.exclude_self)
+  {
+    render_option_.geomgroup[2] = 0;
+  }
   render_option_.geomgroup[3] = 0;
   for (int i = 0; i < mjNGROUP; ++i)
   {

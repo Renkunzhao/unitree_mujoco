@@ -11,14 +11,24 @@ print_scene_information: 1 # Print link, joint and sensors information of robot
 enable_elastic_band: 0 # Virtual spring band, used for lifting h1
 
 depth_camera:
-  enabled: false
+  enabled: true
+  # Go2 visual geoms use group 2 and collision geoms use group 3. Exclude both
+  # from the sensor image so the simulated camera does not see its host robot.
+  exclude_self: false
   camera_name: "front_depth_camera"
   parent_frame: "base_link"
 
-  # Pose of camera_link relative to the Go2 base_link.
+  # Pose of camera_link relative to base_link: translation in meters and ROS
+  # fixed-axis roll/pitch/yaw in radians. These values match the training setup;
+  # replace them with measured hardware extrinsics for a physical-camera match.
   mount:
-    position_m: [0.24, -0.0175, 0.12]
-    rpy_rad: [0.0, 0.4, 0.0]
+    # https://github.com/unitreerobotics/unitree_ros/blob/master/robots/go2_description/urdf/go2_description.urdf front_camera_joint
+    # position_m: [0.32715, -0.00003, 0.04297]
+    position_m: [0.32715, -0.00003, 0.06797] # 0.04297+0.025
+    rpy_rad: [0.0, 0.7, 0.0] # measured from HW 0.6-0.8
+    # https://github.com/ZiwenZhuang/parkour.git
+    # position_m: [0.24, -0.0175, 0.05]
+    # rpy_rad: [0.0, 0.4, 0.0]
 
   sensor:
     model: "d435i"
@@ -28,5 +38,5 @@ depth_camera:
     camera_link_frame_id: "camera_link"
     depth_frame_id: "camera_depth_frame"
     optical_frame_id: "camera_depth_optical_frame"
-    depth_topic: "/camera/camera/depth/image_rect_raw"
-    camera_info_topic: "/camera/camera/depth/camera_info"
+    depth_topic: "/camera/depth/image_rect_raw"
+    camera_info_topic: "/camera/depth/camera_info"

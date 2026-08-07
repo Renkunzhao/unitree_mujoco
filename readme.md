@@ -140,14 +140,20 @@ enable_elastic_band: 0 # For H1
 The C++ simulator can publish the same rectified depth interface used by
 `realsense-ros`:
 
-- `/camera/camera/depth/image_rect_raw`: `sensor_msgs/msg/Image`, `16UC1`
-- `/camera/camera/depth/camera_info`: `sensor_msgs/msg/CameraInfo`
+- `/camera/depth/image_rect_raw`: `sensor_msgs/msg/Image`, `16UC1`
+- `/camera/depth/camera_info`: `sensor_msgs/msg/CameraInfo`
 - `/tf_static`: `base_link -> camera_link -> camera_depth_frame -> camera_depth_optical_frame`
 
 Set the Go2 mount and ROS frame/topic names in `simulate/config.yaml`. Camera
 resolution, frame rate, depth scale, and intrinsics are selected from
-`simulate/camera_profiles.yaml`. The included `calibrated_848x480_30` profile is
-the factory calibration reported by the connected D435I.
+`simulate/camera_profiles.yaml`. `mount` is the pose of `camera_link` relative
+to `base_link`. The selected `calibrated_640x480_30` profile’s depth FOV is `78.79 x 63.26` degrees. Set `exclude_self: true` to keep the Go2 visual and collision geoms out of the depth image.
+
+<!-- https://realsenseai.com/wp-content/uploads/2025/09/Intel-RealSense-D400-Series-Datasheet-October-2025.pdf P68 Table 3-52 -->
+When the depth camera is enabled, the main viewer shows a non-colliding
+`90 x 25 x 25 mm` D435I reference box centered on the configured mount pose.
+The box is excluded from the sensor image. Its datasheet nominal mass of `75 g`
+is not added to the Go2 dynamics.
 
 ```bash
 cd /home/rkz/code/unitree_ws
