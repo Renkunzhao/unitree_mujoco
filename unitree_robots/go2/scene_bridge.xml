@@ -24,7 +24,8 @@
     <geom name="floor" pos="2.0 0 -0.05" size="0 0 0.05" type="plane" material="groundplane"/>
 
     <geom name="platform_a" type="box" size="0.4 0.35 0.05" pos="0.1 0 0.3" rgba="0.3 0.3 0.3 1"/>
-    <geom name="straight_bridge" type="box" size="1.5 0.10 0.05" pos="2.0 0 0.3" rgba="0.5 0.4 0.3 1"/>
+    <geom name="straight_bridge" type="box" size="1.5 0.09 0.05" pos="2.0 0 0.3" rgba="0.5 0.4 0.3 1"/>
+    <!-- <geom name="straight_bridge" type="box" size="1.5 0.10 0.05" pos="2.0 0 0.3" rgba="0.5 0.4 0.3 1"/> -->
     <geom name="platform_b" type="box" size="0.4 0.35 0.05" pos="3.9 0 0.3" rgba="0.3 0.3 0.3 1"/>
 
   </worldbody>

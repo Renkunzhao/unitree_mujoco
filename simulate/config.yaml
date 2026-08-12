@@ -24,10 +24,12 @@ depth_camera:
   mount:
     # https://github.com/unitreerobotics/unitree_ros/blob/master/robots/go2_description/urdf/go2_description.urdf front_camera_joint
     # position_m: [0.32715, -0.00003, 0.04297]
-    position_m: [0.32715, -0.00003, 0.06797] # 0.04297+0.025
+    # position_m: [0.32715, -0.00003, 0.06797] # 0.04297+0.025
+    # position_m: [0.32715, -0.01753, 0.06797]
+    position_m: [0.32715, 0.01747, 0.06797]
     rpy_rad: [0.0, 0.7, 0.0] # measured from HW 0.6-0.8
     # https://github.com/ZiwenZhuang/parkour.git
-    # position_m: [0.24, -0.0175, 0.05]
+    # position_m: [0.24, -0.0175, 0.12]
     # rpy_rad: [0.0, 0.4, 0.0]
 
   sensor:
