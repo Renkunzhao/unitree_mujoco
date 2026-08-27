@@ -1,0 +1,4 @@
+---
+bool success
+string message
+uint64 episode_id

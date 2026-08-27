@@ -10,6 +10,7 @@ find_package(ament_index_cpp REQUIRED)
 find_package(builtin_interfaces REQUIRED)
 find_package(geometry_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
+find_package(rosidl_default_generators REQUIRED)
 find_package(sensor_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(unitree_go REQUIRED)
@@ -19,6 +20,15 @@ find_package(Boost REQUIRED COMPONENTS program_options)
 find_package(glfw3 REQUIRED)
 find_package(Threads REQUIRED)
 find_package(yaml-cpp REQUIRED)
+
+set(interfaces_target ${PROJECT_NAME}_interfaces)
+rosidl_generate_interfaces(${interfaces_target}
+  "msg/EpisodeStatus.msg"
+  "srv/ResetEpisode.srv"
+  "srv/StartEpisode.srv"
+  DEPENDENCIES builtin_interfaces
+  LIBRARY_NAME ${PROJECT_NAME}
+)
 
 set(MUJOCO_DIR "${CMAKE_CURRENT_SOURCE_DIR}/simulate/mujoco" CACHE PATH
     "Path to an extracted MuJoCo distribution")
@@ -32,7 +42,9 @@ endif()
 
 add_executable(unitree_mujoco
   simulate/src/main.cc
+  simulate/src/beam_episode_monitor.cc
   simulate/src/depth_camera.cc
+  simulate/src/episode_manager.cc
   simulate/src/ros2_bridge.cc
   simulate/src/joystick/joystick.cc
   simulate/src/lodepng/lodepng.cpp
@@ -64,6 +76,9 @@ target_link_libraries(unitree_mujoco
   Threads::Threads
   yaml-cpp::yaml-cpp
 )
+rosidl_get_typesupport_target(cpp_typesupport_target
+  ${interfaces_target} "rosidl_typesupport_cpp")
+target_link_libraries(unitree_mujoco "${cpp_typesupport_target}")
 set_target_properties(unitree_mujoco PROPERTIES
   BUILD_RPATH "${MUJOCO_DIR}/lib"
   INSTALL_RPATH "$ORIGIN/.."
@@ -85,6 +100,8 @@ install(FILES
 install(DIRECTORY unitree_robots/
   DESTINATION share/${PROJECT_NAME}/unitree_robots
 )
+
+ament_export_dependencies(rosidl_default_runtime)
 
 get_filename_component(MUJOCO_LIBRARY_REAL "${MUJOCO_LIBRARY}" REALPATH)
 install(FILES "${MUJOCO_LIBRARY_REAL}" DESTINATION lib)

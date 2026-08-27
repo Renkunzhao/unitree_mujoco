@@ -43,6 +43,12 @@
 class DepthCameraPublisher
 {
 public:
+  struct FrameStatus
+  {
+    std::uint64_t generation = 0;
+    builtin_interfaces::msg::Time stamp;
+  };
+
   DepthCameraPublisher(rclcpp::Node::SharedPtr node, param::DepthCameraConfig config);
   ~DepthCameraPublisher();
 
@@ -54,13 +60,17 @@ public:
 
   // The caller must hold the simulator mutex while copying the current state.
   void CaptureIfDue(const mjData* data);
+  std::uint64_t ResetAndCapture(
+      const mjData* data, const builtin_interfaces::msg::Time& stamp);
+  FrameStatus GetFrameStatus() const;
   void Stop();
 
 private:
   void InitializeMessages();
   void PublishStaticTransforms();
   void RenderingLoop();
-  void RenderAndPublish(mjData* data, const builtin_interfaces::msg::Time& stamp);
+  void RenderAndPublish(
+      mjData* data, const builtin_interfaces::msg::Time& stamp, std::uint64_t generation);
   void CompleteRendererInitialization(bool success, std::string error = {});
 
   rclcpp::Node::SharedPtr node_;
@@ -92,7 +102,8 @@ private:
 
   std::thread rendering_thread_;
   std::atomic_bool running_{false};
-  std::mutex data_mutex_;
+  std::mutex publish_mutex_;
+  mutable std::mutex data_mutex_;
   std::condition_variable data_cv_;
   std::condition_variable initialization_cv_;
   bool stop_requested_ = false;
@@ -101,6 +112,10 @@ private:
   bool initialization_success_ = false;
   std::string initialization_error_;
   builtin_interfaces::msg::Time pending_stamp_;
+  std::uint64_t generation_ = 0;
+  std::uint64_t pending_generation_ = 0;
+  std::uint64_t published_generation_ = 0;
+  builtin_interfaces::msg::Time published_stamp_;
 
   bool capture_schedule_initialized_ = false;
   std::chrono::steady_clock::time_point last_capture_wall_time_;

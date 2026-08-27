@@ -206,6 +206,13 @@ public:
     }
   }
 
+  void ClearForReset() override
+  {
+    std::lock_guard<std::mutex> lock(command_mutex_);
+    low_command_ = unitree_go::msg::LowCmd();
+    has_command_ = false;
+  }
+
 private:
   struct Snapshot
   {
@@ -321,6 +328,13 @@ public:
       snapshot_ = std::move(next);
       has_snapshot_ = true;
     }
+  }
+
+  void ClearForReset() override
+  {
+    std::lock_guard<std::mutex> lock(command_mutex_);
+    low_command_ = unitree_hg::msg::LowCmd();
+    has_command_ = false;
   }
 
 private:

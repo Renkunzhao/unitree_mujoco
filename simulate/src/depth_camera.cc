@@ -210,7 +210,8 @@ bool DepthCameraPublisher::Start(const mjModel* model, std::string* error)
 
   InitializeMessages();
 
-  const auto depth_qos = rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile();
+  auto depth_qos = rclcpp::SensorDataQoS();
+  depth_qos.keep_last(1);
   const auto info_qos = rclcpp::QoS(rclcpp::KeepLast(10)).reliable().durability_volatile();
   depth_publisher_ =
       node_->create_publisher<sensor_msgs::msg::Image>(config_.ros.depth_topic, depth_qos);
@@ -225,6 +226,10 @@ bool DepthCameraPublisher::Start(const mjModel* model, std::string* error)
     initialization_complete_ = false;
     initialization_success_ = false;
     initialization_error_.clear();
+    generation_ = 0;
+    pending_generation_ = 0;
+    published_generation_ = 0;
+    published_stamp_ = builtin_interfaces::msg::Time();
   }
   capture_schedule_initialized_ = false;
   rendering_thread_ = std::thread(&DepthCameraPublisher::RenderingLoop, this);
@@ -337,13 +342,22 @@ void DepthCameraPublisher::CaptureIfDue(const mjData* data)
   }
 
   const auto now = std::chrono::steady_clock::now();
-  const auto period = std::chrono::duration<double>(1.0 / config_.profile.fps);
-  if (capture_schedule_initialized_ && now - last_capture_wall_time_ < period)
+  const auto period = std::chrono::duration_cast<std::chrono::steady_clock::duration>(
+      std::chrono::duration<double>(1.0 / config_.profile.fps));
+  if (capture_schedule_initialized_)
   {
-    return;
+    const auto elapsed = now - last_capture_wall_time_;
+    if (elapsed < period)
+    {
+      return;
+    }
+    last_capture_wall_time_ += (elapsed / period) * period;
   }
-  capture_schedule_initialized_ = true;
-  last_capture_wall_time_ = now;
+  else
+  {
+    capture_schedule_initialized_ = true;
+    last_capture_wall_time_ = now;
+  }
 
   {
     std::lock_guard<std::mutex> lock(data_mutex_);
@@ -353,9 +367,45 @@ void DepthCameraPublisher::CaptureIfDue(const mjData* data)
     }
     mjv_copyData(pending_data_, model_, data);
     pending_stamp_ = node_->now();
+    pending_generation_ = generation_;
     frame_pending_ = true;
   }
   data_cv_.notify_one();
+}
+
+std::uint64_t DepthCameraPublisher::ResetAndCapture(
+    const mjData* data, const builtin_interfaces::msg::Time& stamp)
+{
+  if (!running_.load())
+  {
+    return 0;
+  }
+
+  std::uint64_t generation = 0;
+  {
+    std::lock_guard<std::mutex> publish_lock(publish_mutex_);
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    if (stop_requested_)
+    {
+      return 0;
+    }
+    generation_ += 1;
+    generation = generation_;
+    mjv_copyData(pending_data_, model_, data);
+    pending_stamp_ = stamp;
+    pending_generation_ = generation;
+    frame_pending_ = true;
+    capture_schedule_initialized_ = true;
+    last_capture_wall_time_ = std::chrono::steady_clock::now();
+  }
+  data_cv_.notify_one();
+  return generation;
+}
+
+DepthCameraPublisher::FrameStatus DepthCameraPublisher::GetFrameStatus() const
+{
+  std::lock_guard<std::mutex> lock(data_mutex_);
+  return FrameStatus{published_generation_, published_stamp_};
 }
 
 void DepthCameraPublisher::CompleteRendererInitialization(bool success, std::string error)
@@ -439,6 +489,7 @@ void DepthCameraPublisher::RenderingLoop()
   while (true)
   {
     builtin_interfaces::msg::Time stamp;
+    std::uint64_t generation = 0;
     {
       std::unique_lock<std::mutex> lock(data_mutex_);
       data_cv_.wait(lock, [this] { return frame_pending_ || stop_requested_; });
@@ -448,10 +499,11 @@ void DepthCameraPublisher::RenderingLoop()
       }
       std::swap(pending_data_, render_data_);
       stamp = pending_stamp_;
+      generation = pending_generation_;
       frame_pending_ = false;
     }
 
-    RenderAndPublish(render_data_, stamp);
+    RenderAndPublish(render_data_, stamp, generation);
   }
 
   running_.store(false);
@@ -461,7 +513,7 @@ void DepthCameraPublisher::RenderingLoop()
 }
 
 void DepthCameraPublisher::RenderAndPublish(
-    mjData* data, const builtin_interfaces::msg::Time& stamp)
+    mjData* data, const builtin_interfaces::msg::Time& stamp, std::uint64_t generation)
 {
   mjv_updateScene(
       model_, data, &render_option_, nullptr, &render_camera_, mjCAT_ALL, &render_scene_);
@@ -499,10 +551,28 @@ void DepthCameraPublisher::RenderAndPublish(
 
   std::memcpy(
       depth_message_.data.data(), depth_units_.data(), depth_units_.size() * sizeof(std::uint16_t));
-  depth_message_.header.stamp = stamp;
-  camera_info_message_.header.stamp = stamp;
-  depth_publisher_->publish(depth_message_);
-  camera_info_publisher_->publish(camera_info_message_);
+  {
+    std::lock_guard<std::mutex> publish_lock(publish_mutex_);
+    {
+      std::lock_guard<std::mutex> lock(data_mutex_);
+      if (generation != generation_ || stop_requested_)
+      {
+        return;
+      }
+    }
+    depth_message_.header.stamp = stamp;
+    camera_info_message_.header.stamp = stamp;
+    depth_publisher_->publish(depth_message_);
+    camera_info_publisher_->publish(camera_info_message_);
+
+    std::lock_guard<std::mutex> lock(data_mutex_);
+    if (generation != generation_ || stop_requested_)
+    {
+      return;
+    }
+    published_generation_ = generation;
+    published_stamp_ = stamp;
+  }
 }
 
 void DepthCameraPublisher::Stop()

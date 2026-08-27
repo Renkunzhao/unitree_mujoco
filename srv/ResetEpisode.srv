@@ -1,0 +1,8 @@
+float64 base_x_offset
+float64 base_y_offset
+float64 base_yaw_offset
+---
+bool success
+string message
+uint64 episode_id
+builtin_interfaces/Time reset_stamp

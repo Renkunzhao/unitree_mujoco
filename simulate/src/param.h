@@ -96,6 +96,11 @@ inline struct SimulationConfig
     int enable_elastic_band;
     int band_attached_link = 0;
 
+    bool no_viewer = false;
+    bool no_joystick = false;
+    bool beam_monitor = false;
+    double episode_timeout_s = 20.0;
+
     DepthCameraConfig depth_camera;
 
     void load_from_yaml(const std::filesystem::path& filename)
@@ -203,11 +208,28 @@ inline po::variables_map helper(int argc, char** argv)
         ("robot,r", po::value<std::string>(&config.robot), "Robot type; -r go2")
         ("scene,s", po::value<std::filesystem::path>(&config.robot_scene), "Robot scene file; -s scene_terrain.xml")
         ("depth-camera", po::value<bool>(&config.depth_camera.enabled)->implicit_value(true),
-         "Enable the configured ROS 2 depth camera");
+         "Enable the configured ROS 2 depth camera")
+        ("no-viewer", po::bool_switch(&config.no_viewer),
+         "Run without the interactive MuJoCo viewer")
+        ("no-joystick", po::bool_switch(&config.no_joystick),
+         "Disable the configured physical joystick publisher")
+        ("beam-monitor", po::bool_switch(&config.beam_monitor),
+         "Enable ground-truth beam episode monitoring")
+        ("episode-timeout", po::value<double>(&config.episode_timeout_s),
+         "Episode timeout in simulation seconds");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
+
+    if (!std::isfinite(config.episode_timeout_s) || config.episode_timeout_s <= 0.0)
+    {
+        throw std::runtime_error("--episode-timeout must be finite and positive");
+    }
+    if (config.no_joystick)
+    {
+        config.use_joystick = 0;
+    }
 
     if (vm.count("help"))
     {

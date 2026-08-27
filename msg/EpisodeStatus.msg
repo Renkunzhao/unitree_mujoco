@@ -1,0 +1,19 @@
+uint8 WAITING=0
+uint8 RUNNING=1
+uint8 SUCCESS=2
+uint8 SELF_COLLISION=3
+uint8 ILLEGAL_CONTACT=4
+uint8 FELL_OVER=5
+uint8 TIMEOUT=6
+
+builtin_interfaces/Time stamp
+uint64 episode_id
+uint8 outcome
+bool depth_ready
+builtin_interfaces/Time depth_stamp
+float64 elapsed_time_s
+float64 roll
+float64 pitch
+float64 angular_velocity_rad_s
+float64 linear_velocity_m_s
+string message

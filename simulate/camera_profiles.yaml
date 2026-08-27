@@ -3,6 +3,18 @@
 models:
   d435i:
     profiles:
+      calibrated_848x480_90:
+        width: 848
+        height: 480
+        fps: 90.0
+        depth_scale_m: 0.001
+        fx: 430.2142028808594
+        fy: 430.2142028808594
+        cx: 427.59716796875
+        cy: 237.16070556640625
+        distortion_model: "plumb_bob"
+        distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
+
       calibrated_848x480_30:
         width: 848
         height: 480

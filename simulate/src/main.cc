@@ -29,6 +29,7 @@
 #include <memory>
 #include <mutex>
 #include <new>
+#include <optional>
 #include <string>
 #include <thread>
 #include <vector>
@@ -38,7 +39,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include "simulate.h"
 #include "array_safety.h"
+#include "beam_episode_monitor.h"
 #include "depth_camera.h"
+#include "episode_manager.h"
 #include "param.h"
 #include "ros2_bridge.h"
 
@@ -112,6 +115,8 @@ namespace
   rclcpp::Node::SharedPtr camera_node;
   std::unique_ptr<Ros2BridgeBase> robot_bridge;
   std::unique_ptr<DepthCameraPublisher> depth_camera;
+  std::unique_ptr<BeamEpisodeMonitor> beam_episode_monitor;
+  std::unique_ptr<EpisodeManager> episode_manager;
   std::atomic_bool physics_failed{false};
 
   using Seconds = std::chrono::duration<double>;
@@ -349,8 +354,99 @@ namespace
     return mnew;
   }
 
+  bool ProcessPendingEpisodeOperations(mj::Simulate& sim)
+  {
+    bool reset_applied = false;
+    if (const auto request = episode_manager->TakeResetRequest())
+    {
+      try
+      {
+        mj_resetData(m, d);
+        const int base_qpos_address = episode_manager->base_qpos_address();
+        d->qpos[base_qpos_address] += request->base_x_offset;
+        d->qpos[base_qpos_address + 1] += request->base_y_offset;
+
+        if (request->base_yaw_offset != 0.0)
+        {
+          const mjtNum yaw_quaternion[4]{
+              std::cos(0.5 * request->base_yaw_offset), 0.0, 0.0,
+              std::sin(0.5 * request->base_yaw_offset)};
+          mjtNum rotated_quaternion[4]{};
+          mju_mulQuat(
+              rotated_quaternion, yaw_quaternion, d->qpos + base_qpos_address + 3);
+          mju_normalize4(rotated_quaternion);
+          mju_copy(d->qpos + base_qpos_address + 3, rotated_quaternion, 4);
+        }
+
+        if (ctrlnoise)
+        {
+          mju_zero(ctrlnoise, m->nu);
+        }
+        sim.pert.active = 0;
+        sim.pert.select = 0;
+        elastic_band.f_ = {0.0, 0.0, 0.0};
+        robot_bridge->ClearForReset();
+
+        mj_forward(m, d);
+        robot_bridge->CaptureState();
+        const builtin_interfaces::msg::Time reset_stamp = robot_node->now();
+        const std::uint64_t depth_generation =
+            depth_camera ? depth_camera->ResetAndCapture(d, reset_stamp) : 0;
+        const std::uint64_t episode_id =
+            episode_manager->Reset(d, reset_stamp, depth_generation);
+        episode_manager->CompleteReset(true, "episode reset complete", episode_id, reset_stamp);
+        sim.speed_changed = true;
+        reset_applied = true;
+      }
+      catch (const std::exception& error)
+      {
+        const builtin_interfaces::msg::Time failure_stamp = robot_node->now();
+        episode_manager->CompleteReset(
+            false, error.what(), episode_manager->episode_id(), failure_stamp);
+      }
+    }
+
+    if (episode_manager->TakeStartRequest())
+    {
+      const builtin_interfaces::msg::Time start_stamp = robot_node->now();
+      try
+      {
+        std::string error;
+        const bool success = episode_manager->Start(d, start_stamp, &error);
+        episode_manager->CompleteStart(
+            success, success ? "episode started" : std::move(error),
+            episode_manager->episode_id());
+      }
+      catch (const std::exception& error)
+      {
+        episode_manager->CompleteStart(
+            false, error.what(), episode_manager->episode_id());
+      }
+    }
+    return reset_applied;
+  }
+
+  void UpdateEpisodeState()
+  {
+    if (!episode_manager)
+    {
+      return;
+    }
+    if (depth_camera)
+    {
+      const auto frame_status = depth_camera->GetFrameStatus();
+      episode_manager->UpdateDepthStatus(frame_status.generation, frame_status.stamp);
+    }
+    std::optional<TerminalResult> terminal_result;
+    if (episode_manager->running())
+    {
+      terminal_result = beam_episode_monitor->Update(d);
+    }
+    episode_manager->Update(d, std::move(terminal_result));
+  }
+
   // simulate in background thread (while rendering in main thread)
-  void PhysicsLoop(mj::Simulate &sim)
+  void PhysicsLoop(mj::Simulate &sim, bool viewer_enabled)
   {
     // cpu-sim syncronization point
     std::chrono::time_point<mj::Simulate::Clock> syncCPU;
@@ -448,6 +544,11 @@ namespace
         // run only if model is present
         if (m)
         {
+          if (episode_manager && ProcessPendingEpisodeOperations(sim))
+          {
+            continue;
+          }
+
           // running
           if (sim.run)
           {
@@ -509,6 +610,7 @@ namespace
               {
                 robot_bridge->CaptureState();
               }
+              UpdateEpisodeState();
               stepped = true;
             }
 
@@ -566,6 +668,7 @@ namespace
                 {
                   robot_bridge->CaptureState();
                 }
+                UpdateEpisodeState();
                 stepped = true;
 
                 // break if reset
@@ -579,7 +682,10 @@ namespace
             // save current state to history buffer
             if (stepped)
             {
-              sim.AddToHistory();
+              if (viewer_enabled)
+              {
+                sim.AddToHistory();
+              }
               if (depth_camera)
               {
                 depth_camera->CaptureIfDue(d);
@@ -600,6 +706,7 @@ namespace
             {
               robot_bridge->CaptureState();
             }
+            UpdateEpisodeState();
             if (depth_camera)
             {
               depth_camera->CaptureIfDue(d);
@@ -614,18 +721,24 @@ namespace
 
 //-------------------------------------- physics_thread --------------------------------------------
 
-void PhysicsThread(mj::Simulate *sim, const char *filename)
+void PhysicsThread(mj::Simulate *sim, const char *filename, bool viewer_enabled)
 {
   // request loadmodel if file given (otherwise drag-and-drop)
   if (filename != nullptr)
   {
-    sim->LoadMessage(filename);
+    if (viewer_enabled)
+    {
+      sim->LoadMessage(filename);
+    }
     m = LoadModel(filename, *sim);
     if (m)
       d = mj_makeData(m);
     if (d)
     {
-      sim->Load(m, d, filename);
+      if (viewer_enabled)
+      {
+        sim->Load(m, d, filename);
+      }
       mj_forward(m, d);
 
       // allocate ctrlnoise
@@ -646,10 +759,18 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
         }
         param::config.band_attached_link = 6 * body_id;
         robot_bridge = CreateRos2Bridge(robot_node, m, d);
+        if (param::config.beam_monitor)
+        {
+          auto monitor = std::make_unique<BeamEpisodeMonitor>(m);
+          auto manager = std::make_unique<EpisodeManager>(
+              robot_node, m, param::config.episode_timeout_s);
+          beam_episode_monitor = std::move(monitor);
+          episode_manager = std::move(manager);
+        }
       }
       catch (const std::exception& error)
       {
-        std::fprintf(stderr, "Failed to start ROS 2 robot bridge: %s\n", error.what());
+        std::fprintf(stderr, "Failed to start ROS 2 bridge: %s\n", error.what());
         physics_failed.store(true);
         sim->exitrequest.store(true);
       }
@@ -673,7 +794,7 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
     }
   }
 
-  PhysicsLoop(*sim);
+  PhysicsLoop(*sim, viewer_enabled);
 
   // delete everything we allocated
   sim->exitrequest.store(true);
@@ -685,6 +806,7 @@ void PhysicsThread(mj::Simulate *sim, const char *filename)
   }
   free(ctrlnoise);
   ctrlnoise = nullptr;
+  beam_episode_monitor.reset();
   mj_deleteData(d);
   mj_deleteModel(m);
   d = nullptr;
@@ -813,25 +935,44 @@ int main(int argc, char **argv)
   }
   std::thread executor_thread([&executor]() { executor.spin(); });
 
-  // simulate object encapsulates the UI
+  // Simulate still owns synchronization state in no-viewer mode, but its GLFW
+  // window is hidden and its render loop is never entered.
+  auto platform_ui = std::make_unique<mj::GlfwAdapter>();
+  if (param::config.no_viewer)
+  {
+    glfwHideWindow(platform_ui->window_);
+  }
   auto sim = std::make_unique<mj::Simulate>(
-    std::make_unique<mj::GlfwAdapter>(),
-    &cam, &opt, &pert, /* is_passive = */ false);
+      std::move(platform_ui), &cam, &opt, &pert, /* is_passive = */ false);
 
   // start physics thread
-  std::thread physicsthreadhandle(&PhysicsThread, sim.get(), param::config.robot_scene.c_str());
-  // start simulation UI loop (blocking call)
-  glfwSetKeyCallback(static_cast<mj::GlfwAdapter*>(sim->platform_ui.get())->window_,user_key_cb);
-  sim->RenderLoop();
-  sim->exitrequest.store(true);
-  physicsthreadhandle.join();
+  std::thread physicsthreadhandle(
+      &PhysicsThread, sim.get(), param::config.robot_scene.c_str(), !param::config.no_viewer);
+  if (param::config.no_viewer)
+  {
+    physicsthreadhandle.join();
+  }
+  else
+  {
+    // start simulation UI loop (blocking call)
+    glfwSetKeyCallback(
+        static_cast<mj::GlfwAdapter*>(sim->platform_ui.get())->window_, user_key_cb);
+    sim->RenderLoop();
+    sim->exitrequest.store(true);
+    physicsthreadhandle.join();
+  }
 
+  if (episode_manager)
+  {
+    episode_manager->Shutdown();
+  }
   executor.cancel();
   if (rclcpp::ok())
   {
     rclcpp::shutdown();
   }
   executor_thread.join();
+  episode_manager.reset();
   robot_bridge.reset();
   camera_node.reset();
   robot_node.reset();

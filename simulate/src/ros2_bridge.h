@@ -19,6 +19,7 @@ public:
 
   virtual void ApplyCommand() = 0;
   virtual void CaptureState() = 0;
+  virtual void ClearForReset() = 0;
 
   void StartStatePublisher();
 
