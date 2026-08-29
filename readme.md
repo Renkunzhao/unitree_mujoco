@@ -147,9 +147,9 @@ The C++ simulator can publish the same rectified depth interface used by
 Set the Go2 mount and ROS frame/topic names in `simulate/config.yaml`. Camera
 resolution, frame rate, depth scale, and intrinsics are selected from
 `simulate/camera_profiles.yaml`. `mount` is the pose of `camera_link` relative
-to `base_link`. The selected `calibrated_848x480_90` profile's depth FOV is
-`89.17 x 58.31` degrees. Set `exclude_self: true` to hide the Go2 visual geoms;
-collision geoms are always excluded from the depth image.
+to `base_link`.
+Set `exclude_self: true` to hide the Go2 visual geoms; collision geoms are
+always excluded from the depth image.
 
 <!-- https://realsenseai.com/wp-content/uploads/2025/09/Intel-RealSense-D400-Series-Datasheet-October-2025.pdf P68 Table 3-52 -->
 When the depth camera is enabled, the main viewer shows a non-colliding

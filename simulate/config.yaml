@@ -34,7 +34,7 @@ depth_camera:
 
   sensor:
     model: "d435i"
-    profile: "calibrated_848x480_90"
+    profile: "calibrated_424x240_60"
 
   ros:
     camera_link_frame_id: "camera_link"

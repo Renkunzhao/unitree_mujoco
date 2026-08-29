@@ -21,7 +21,7 @@
 
     <!-- Low catch floor below the bridge.  It is intentionally below the camera
       prior's height filter, so the bridge remains the local walkable surface. -->
-    <geom name="floor" pos="2.0 0 -0.05" size="0 0 0.05" type="plane" material="groundplane"/>
+    <geom name="floor" pos="2.0 0 0.0" size="0 0 0.05" type="plane" material="groundplane"/>
 
     <geom name="platform_a" type="box" size="0.4 0.35 0.15" pos="0.1 0 0.15" rgba="0.3 0.3 0.3 1"/>
     <geom name="straight_bridge" type="box" size="1.5 0.05 0.05" pos="2.0 0 0.25" rgba="0.5 0.4 0.3 1"/>

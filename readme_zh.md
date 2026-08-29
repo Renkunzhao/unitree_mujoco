@@ -144,9 +144,8 @@ C++ 仿真器可以发布与 `realsense-ros` 相同的校正后深度接口：
 
 在 `simulate/config.yaml` 中设置 Go2 相机安装位姿以及 ROS frame/topic，在
 `simulate/camera_profiles.yaml` 中选择分辨率、帧率、深度单位和内参。`mount`
-表示 `camera_link` 相对 `base_link` 的位姿。当前选择的
-`calibrated_848x480_90` 视场为 `89.17 x 58.31` 度。设置
-`exclude_self: true` 可隐藏 Go2 的视觉几何；碰撞几何始终不会出现在深度图中。
+表示 `camera_link` 相对 `base_link` 的位姿。设置 `exclude_self: true` 可隐藏 Go2 的视觉几何；
+碰撞几何始终不会出现在深度图中。
 
 <!-- https://realsenseai.com/wp-content/uploads/2025/09/Intel-RealSense-D400-Series-Datasheet-October-2025.pdf P68 Table 3-52 -->
 启用深度相机后，主视窗会在配置的 mount 位姿中心显示一个无碰撞的

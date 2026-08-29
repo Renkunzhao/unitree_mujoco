@@ -38,3 +38,27 @@ models:
         cy: 237.428558349609
         distortion_model: "plumb_bob"
         distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+      calibrated_424x240_90:
+        width: 424
+        height: 240
+        fps: 90.0
+        depth_scale_m: 0.001
+        fx: 215.10710144043
+        fy: 215.10710144043
+        cx: 213.798583984375
+        cy: 118.580352783203
+        distortion_model: "plumb_bob"
+        distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
+
+      calibrated_424x240_60:
+        width: 424
+        height: 240
+        fps: 60.0
+        depth_scale_m: 0.001
+        fx: 215.10710144043
+        fy: 215.10710144043
+        cx: 213.798583984375
+        cy: 118.580352783203
+        distortion_model: "plumb_bob"
+        distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
