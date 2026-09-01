@@ -57,6 +57,7 @@ struct DepthCameraConfig
     CameraMountConfig mount;
     std::string model;
     std::string profile_name;
+    std::filesystem::path noise_config_path;
     CameraProfile profile;
     CameraRosConfig ros;
 };
@@ -128,6 +129,7 @@ inline struct SimulationConfig
                 read_array<3>(camera["mount"]["rpy_rad"], "depth_camera.mount.rpy_rad");
             depth_camera.model = camera["sensor"]["model"].as<std::string>();
             depth_camera.profile_name = camera["sensor"]["profile"].as<std::string>();
+            depth_camera.noise_config_path = camera["noise_config_path"].as<std::string>();
             depth_camera.ros.camera_link_frame_id =
                 camera["ros"]["camera_link_frame_id"].as<std::string>();
             depth_camera.ros.depth_frame_id = camera["ros"]["depth_frame_id"].as<std::string>();
@@ -209,6 +211,8 @@ inline po::variables_map helper(int argc, char** argv)
         ("scene,s", po::value<std::filesystem::path>(&config.robot_scene), "Robot scene file; -s scene_terrain.xml")
         ("depth-camera", po::value<bool>(&config.depth_camera.enabled)->implicit_value(true),
          "Enable the configured ROS 2 depth camera")
+        ("depth-noise-config", po::value<std::filesystem::path>(&config.depth_camera.noise_config_path),
+         "Absolute path to the depth image noise YAML")
         ("no-viewer", po::bool_switch(&config.no_viewer),
          "Run without the interactive MuJoCo viewer")
         ("no-joystick", po::bool_switch(&config.no_joystick),
@@ -225,6 +229,11 @@ inline po::variables_map helper(int argc, char** argv)
     if (!std::isfinite(config.episode_timeout_s) || config.episode_timeout_s <= 0.0)
     {
         throw std::runtime_error("--episode-timeout must be finite and positive");
+    }
+    if (!config.depth_camera.noise_config_path.empty() &&
+        !config.depth_camera.noise_config_path.is_absolute())
+    {
+        throw std::runtime_error("depth noise config path must be absolute");
     }
     if (config.no_joystick)
     {

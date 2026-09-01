@@ -36,6 +36,9 @@ depth_camera:
     model: "d435i"
     profile: "calibrated_424x240_60"
 
+  # May be overridden with --depth-noise-config. A nonempty path must be absolute.
+  noise_config_path: "path/to/depth_noise_config.yaml"
+
   ros:
     camera_link_frame_id: "camera_link"
     depth_frame_id: "camera_depth_frame"

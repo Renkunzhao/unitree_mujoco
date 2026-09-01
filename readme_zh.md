@@ -147,6 +147,11 @@ C++ 仿真器可以发布与 `realsense-ros` 相同的校正后深度接口：
 表示 `camera_link` 相对 `base_link` 的位姿。设置 `exclude_self: true` 可隐藏 Go2 的视觉几何；
 碰撞几何始终不会出现在深度图中。
 
+深度图退化由 `depth_camera.noise_config_path` 指向的外部绝对路径 YAML 配置，
+`--depth-noise-config` 会覆盖该值。噪声 YAML 使用明确的 `process_order`，当前支持
+`stereo_occlusion`、`correlated_dropout` 和 `pixel_dropout`。将路径设为空字符串时发布
+无噪声的渲染深度图。
+
 <!-- https://realsenseai.com/wp-content/uploads/2025/09/Intel-RealSense-D400-Series-Datasheet-October-2025.pdf P68 Table 3-52 -->
 启用深度相机后，主视窗会在配置的 mount 位姿中心显示一个无碰撞的
 `90 x 25 x 25 mm` D435I 参考 box。该 box 不会出现在传感器图像中，也不会把
@@ -156,7 +161,9 @@ datasheet 中标称的 `75 g` 质量加入 Go2 动力学。
 cd /home/rkz/code/unitree_ws
 source src/unitree_lowlevel/scripts/setup.sh lo jazzy
 ros2 run unitree_mujoco unitree_mujoco \
-  -r go2 -s scene_bridge.xml --depth-camera
+  -r go2 -s scene_bridge.xml --depth-camera \
+  --depth-noise-config \
+  /home/rkz/code/unitree_ws/src/legged_rl_deploy/policies/go2/unitree_rl_mjlab/beam_depth_distillation/depth_image_noise.yaml
 ```
 
 机器人 bridge 和相机共用一个 ROS 2 context。`ROS_DOMAIN_ID`、RMW 和网卡只由

@@ -75,6 +75,16 @@ bool IsBigEndian()
 DepthCameraPublisher::DepthCameraPublisher(rclcpp::Node::SharedPtr node, param::DepthCameraConfig config)
     : node_(std::move(node)), config_(std::move(config))
 {
+  if (!config_.noise_config_path.empty())
+  {
+    depth_noise_ = std::make_unique<DepthNoiseSimulator>(
+        config_.noise_config_path,
+        DepthNoiseSimulator::Camera{
+            config_.profile.width,
+            config_.profile.height,
+            config_.profile.intrinsics.fx,
+            config_.profile.depth_scale_m});
+  }
 }
 
 DepthCameraPublisher::~DepthCameraPublisher()
@@ -251,6 +261,11 @@ bool DepthCameraPublisher::Start(const mjModel* model, std::string* error)
       "Publishing RealSense-compatible depth on %s and %s",
       config_.ros.depth_topic.c_str(),
       config_.ros.camera_info_topic.c_str());
+  if (depth_noise_)
+  {
+    RCLCPP_INFO(
+        node_->get_logger(), "Depth image noise: %s", depth_noise_->description().c_str());
+  }
   return true;
 }
 
@@ -547,6 +562,17 @@ void DepthCameraPublisher::RenderAndPublish(
         destination[x] = static_cast<std::uint16_t>(std::llround(units));
       }
     }
+  }
+
+  if (depth_noise_)
+  {
+    if (!noise_generation_initialized_ || noise_generation_ != generation)
+    {
+      depth_noise_->Reset();
+      noise_generation_ = generation;
+      noise_generation_initialized_ = true;
+    }
+    depth_noise_->Apply(&depth_units_);
   }
 
   std::memcpy(

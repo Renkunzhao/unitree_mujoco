@@ -44,6 +44,7 @@ add_executable(unitree_mujoco
   simulate/src/main.cc
   simulate/src/beam_episode_monitor.cc
   simulate/src/depth_camera.cc
+  simulate/src/depth_noise.cc
   simulate/src/episode_manager.cc
   simulate/src/ros2_bridge.cc
   simulate/src/joystick/joystick.cc

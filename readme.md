@@ -151,6 +151,12 @@ to `base_link`.
 Set `exclude_self: true` to hide the Go2 visual geoms; collision geoms are
 always excluded from the depth image.
 
+Depth image artifacts are configured by the external absolute path in
+`depth_camera.noise_config_path`. `--depth-noise-config` overrides that value.
+The noise YAML uses an explicit `process_order` and currently supports
+`stereo_occlusion`, `correlated_dropout`, and `pixel_dropout`. Set the path to
+an empty string to publish clean rendered depth.
+
 <!-- https://realsenseai.com/wp-content/uploads/2025/09/Intel-RealSense-D400-Series-Datasheet-October-2025.pdf P68 Table 3-52 -->
 When the depth camera is enabled, the main viewer shows a non-colliding
 `90 x 25 x 25 mm` D435I reference box centered on the configured mount pose.
@@ -161,7 +167,9 @@ is not added to the Go2 dynamics.
 cd /home/rkz/code/unitree_ws
 source src/unitree_lowlevel/scripts/setup.sh lo jazzy
 ros2 run unitree_mujoco unitree_mujoco \
-  -r go2 -s scene_bridge.xml --depth-camera
+  -r go2 -s scene_bridge.xml --depth-camera \
+  --depth-noise-config \
+  /home/rkz/code/unitree_ws/src/legged_rl_deploy/policies/go2/unitree_rl_mjlab/beam_depth_distillation/depth_image_noise.yaml
 ```
 
 The robot bridge and camera use the same ROS 2 context. `ROS_DOMAIN_ID`, RMW,

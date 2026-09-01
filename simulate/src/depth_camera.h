@@ -38,6 +38,7 @@
 #include <sensor_msgs/msg/image.hpp>
 #include <tf2_ros/static_transform_broadcaster.hpp>
 
+#include "depth_noise.h"
 #include "param.h"
 
 class DepthCameraPublisher
@@ -96,6 +97,9 @@ private:
 
   std::vector<float> raw_depth_;
   std::vector<std::uint16_t> depth_units_;
+  std::unique_ptr<DepthNoiseSimulator> depth_noise_;
+  bool noise_generation_initialized_ = false;
+  std::uint64_t noise_generation_ = 0;
 
   float near_distance_ = 0.0f;
   float depth_linearization_scale_ = 0.0f;

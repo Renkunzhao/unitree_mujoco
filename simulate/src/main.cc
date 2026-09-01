@@ -920,6 +920,9 @@ int main(int argc, char **argv)
   catch (const std::exception& error)
   {
     std::fprintf(stderr, "Failed to initialize unitree_mujoco: %s\n", error.what());
+    depth_camera.reset();
+    camera_node.reset();
+    robot_node.reset();
     if (rclcpp::ok())
     {
       rclcpp::shutdown();
