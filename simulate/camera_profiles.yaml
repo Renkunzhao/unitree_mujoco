@@ -27,6 +27,20 @@ models:
         distortion_model: "plumb_bob"
         distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
 
+      # Measured 848x480 depth stream after factor-4 decimation.
+      # fx, fy, cx, and cy are the measured 848x480 intrinsics divided by 4.
+      decimated_212x120_60:
+        width: 212
+        height: 120
+        fps: 60.0
+        depth_scale_m: 0.001
+        fx: 107.55355072021475
+        fy: 107.55355072021475
+        cx: 106.8992919921875
+        cy: 59.2901763916015
+        distortion_model: "plumb_bob"
+        distortion: [0.0, 0.0, 0.0, 0.0, 0.0]
+
       calibrated_640x480_30:
         width: 640
         height: 480

@@ -34,7 +34,7 @@ depth_camera:
 
   sensor:
     model: "d435i"
-    profile: "calibrated_424x240_60"
+    profile: "decimated_212x120_60"
 
   # May be overridden with --depth-noise-config. A nonempty path must be absolute.
   noise_config_path: "path/to/depth_noise_config.yaml"
