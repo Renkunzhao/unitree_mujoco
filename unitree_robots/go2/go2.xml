@@ -64,6 +64,7 @@
   </asset>
 
   <worldbody>
+    <!-- total mass: 16.514412 kg, hw: 16.45 kg -->
     <body name="base_link" pos="0 0 1.0" childclass="go2">
       <inertial pos="0.021112 0 -0.005366" quat="-0.000543471 0.713435 -0.00173769 0.700719"
         mass="6.921"
@@ -82,6 +83,10 @@
       <geom name="front_depth_camera_visual" type="box" pos="0 0 0"
         size="0.0125 0.045 0.0125"
         contype="0" conaffinity="0" group="1" rgba="0 0 0 0" />
+      <body name="FL_hip_rotor" pos="0.11215 0.04675 0">
+        <inertial pos="0 0 0" mass="0.089"
+          diaginertia="0.000111842 0.000059647 0.000059647" />
+      </body>
       <body name="FL_hip" pos="0.1934 0.0465 0">
         <inertial pos="-0.0054 0.00194 -0.000105" quat="0.497014 0.499245 0.505462 0.498237"
           mass="0.678"
@@ -90,6 +95,10 @@
         <geom mesh="hip_0" material="metal" class="visual" />
         <geom mesh="hip_1" material="gray" class="visual" />
         <geom size="0.046 0.02" pos="0 0.08 0" quat="1 1 0 0" type="cylinder" class="collision" />
+        <body name="FL_thigh_rotor" pos="0 -0.00015 0">
+          <inertial pos="0 0 0" mass="0.089"
+            diaginertia="0.000059647 0.000111842 0.000059647" />
+        </body>
         <body name="FL_thigh" pos="0 0.0955 0">
           <inertial pos="-0.00374 -0.0223 -0.0327" quat="0.829533 0.0847635 -0.0200632 0.551623"
             mass="1.152"
@@ -99,6 +108,10 @@
           <geom mesh="thigh_1" material="gray" class="visual" />
           <geom size="0.1065 0.01225 0.017" pos="0 0 -0.1065" quat="0.707107 0 0.707107 0"
             type="box" class="collision" />
+          <body name="FL_calf_rotor" pos="0 -0.03235 0">
+            <inertial pos="0 0 0" mass="0.089"
+              diaginertia="0.000059647 0.000111842 0.000059647" />
+          </body>
           <body name="FL_calf" pos="0 0 -0.213">
             <inertial pos="0.00629595 -0.000622121 -0.141417"
               quat="0.710672 0.00154099 -0.00450087 0.703508"
@@ -123,6 +136,10 @@
           </body>
         </body>
       </body>
+      <body name="FR_hip_rotor" pos="0.11215 -0.04675 0">
+        <inertial pos="0 0 0" mass="0.089"
+          diaginertia="0.000111842 0.000059647 0.000059647" />
+      </body>
       <body name="FR_hip" pos="0.1934 -0.0465 0">
         <inertial pos="-0.0054 -0.00194 -0.000105" quat="0.498237 0.505462 0.499245 0.497014"
           mass="0.678"
@@ -132,6 +149,10 @@
         <geom mesh="hip_1" material="gray" class="visual" quat="4.63268e-05 1 0 0" />
         <geom size="0.046 0.02" pos="0 -0.08 0" quat="0.707107 0.707107 0 0" type="cylinder"
           class="collision" />
+        <body name="FR_thigh_rotor" pos="0 0.00015 0">
+          <inertial pos="0 0 0" mass="0.089"
+            diaginertia="0.000059647 0.000111842 0.000059647" />
+        </body>
         <body name="FR_thigh" pos="0 -0.0955 0">
           <inertial pos="-0.00374 0.0223 -0.0327" quat="0.551623 -0.0200632 0.0847635 0.829533"
             mass="1.152"
@@ -141,6 +162,10 @@
           <geom mesh="thigh_mirror_1" material="gray" class="visual" />
           <geom size="0.1065 0.01225 0.017" pos="0 0 -0.1065" quat="0.707107 0 0.707107 0"
             type="box" class="collision" />
+          <body name="FR_calf_rotor" pos="0 0.03235 0">
+            <inertial pos="0 0 0" mass="0.089"
+              diaginertia="0.000059647 0.000111842 0.000059647" />
+          </body>
           <body name="FR_calf" pos="0 0 -0.213">
             <inertial pos="0.00629595 0.000622121 -0.141417"
               quat="0.703508 -0.00450087 0.00154099 0.710672"
@@ -165,6 +190,10 @@
           </body>
         </body>
       </body>
+      <body name="RL_hip_rotor" pos="-0.11215 0.04675 0">
+        <inertial pos="0 0 0" mass="0.089"
+          diaginertia="0.000111842 0.000059647 0.000059647" />
+      </body>
       <body name="RL_hip" pos="-0.1934 0.0465 0">
         <inertial pos="0.0054 0.00194 -0.000105" quat="0.505462 0.498237 0.497014 0.499245"
           mass="0.678"
@@ -174,6 +203,10 @@
         <geom mesh="hip_1" material="gray" class="visual" quat="4.63268e-05 0 1 0" />
         <geom size="0.046 0.02" pos="0 0.08 0" quat="0.707107 0.707107 0 0" type="cylinder"
           class="collision" />
+        <body name="RL_thigh_rotor" pos="0 -0.00015 0">
+          <inertial pos="0 0 0" mass="0.089"
+            diaginertia="0.000059647 0.000111842 0.000059647" />
+        </body>
         <body name="RL_thigh" pos="0 0.0955 0">
           <inertial pos="-0.00374 -0.0223 -0.0327" quat="0.829533 0.0847635 -0.0200632 0.551623"
             mass="1.152"
@@ -183,6 +216,10 @@
           <geom mesh="thigh_1" material="gray" class="visual" />
           <geom size="0.1065 0.01225 0.017" pos="0 0 -0.1065" quat="0.707107 0 0.707107 0"
             type="box" class="collision" />
+          <body name="RL_calf_rotor" pos="0 -0.03235 0">
+            <inertial pos="0 0 0" mass="0.089"
+              diaginertia="0.000059647 0.000111842 0.000059647" />
+          </body>
           <body name="RL_calf" pos="0 0 -0.213">
             <inertial pos="0.00629595 -0.000622121 -0.141417"
               quat="0.710672 0.00154099 -0.00450087 0.703508"
@@ -207,6 +244,10 @@
           </body>
         </body>
       </body>
+      <body name="RR_hip_rotor" pos="-0.11215 -0.04675 0">
+        <inertial pos="0 0 0" mass="0.089"
+          diaginertia="0.000111842 0.000059647 0.000059647" />
+      </body>
       <body name="RR_hip" pos="-0.1934 -0.0465 0">
         <inertial pos="0.0054 -0.00194 -0.000105" quat="0.499245 0.497014 0.498237 0.505462"
           mass="0.678"
@@ -218,6 +259,10 @@
           quat="2.14617e-09 4.63268e-05 4.63268e-05 -1" />
         <geom size="0.046 0.02" pos="0 -0.08 0" quat="0.707107 0.707107 0 0" type="cylinder"
           class="collision" />
+        <body name="RR_thigh_rotor" pos="0 0.00015 0">
+          <inertial pos="0 0 0" mass="0.089"
+            diaginertia="0.000059647 0.000111842 0.000059647" />
+        </body>
         <body name="RR_thigh" pos="0 -0.0955 0">
           <inertial pos="-0.00374 0.0223 -0.0327" quat="0.551623 -0.0200632 0.0847635 0.829533"
             mass="1.152"
@@ -227,6 +272,10 @@
           <geom mesh="thigh_mirror_1" material="gray" class="visual" />
           <geom size="0.1065 0.01225 0.017" pos="0 0 -0.1065" quat="0.707107 0 0.707107 0"
             type="box" class="collision" />
+          <body name="RR_calf_rotor" pos="0 0.03235 0">
+            <inertial pos="0 0 0" mass="0.089"
+              diaginertia="0.000059647 0.000111842 0.000059647" />
+          </body>
           <body name="RR_calf" pos="0 0 -0.213">
             <inertial pos="0.00629595 0.000622121 -0.141417"
               quat="0.703508 -0.00450087 0.00154099 0.710672"
