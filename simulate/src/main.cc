@@ -42,7 +42,9 @@
 #include "beam_episode_monitor.h"
 #include "depth_camera.h"
 #include "episode_manager.h"
+#include "inertial_gt.h"
 #include "param.h"
+#include "payload.h"
 #include "ros2_bridge.h"
 
 #define MUJOCO_PLUGIN_DIR "mujoco_plugin"
@@ -117,6 +119,7 @@ namespace
   std::unique_ptr<DepthCameraPublisher> depth_camera;
   std::unique_ptr<BeamEpisodeMonitor> beam_episode_monitor;
   std::unique_ptr<EpisodeManager> episode_manager;
+  std::unique_ptr<inertial_gt::Publisher> inertial_gt_publisher;
   std::atomic_bool physics_failed{false};
 
   using Seconds = std::chrono::duration<double>;
@@ -301,15 +304,67 @@ namespace
         !std::strncmp(filename + mju::strlen_arr(filename) - 4, ".mjb",
                       mju::sizeof_arr(filename) - mju::strlen_arr(filename) + 4))
     {
-      mnew = mj_loadModel(filename, nullptr);
-      if (!mnew)
+      if (param::config.payload_enabled)
       {
-        mju::strcpy_arr(loadError, "could not load binary model");
+        mju::strcpy_arr(
+            loadError,
+            "--max-payload-count requires an XML scene, not an MJB model");
+      }
+      else
+      {
+        mnew = mj_loadModel(filename, nullptr);
+        if (!mnew)
+        {
+          mju::strcpy_arr(loadError, "could not load binary model");
+        }
       }
     }
     else
     {
-      mnew = mj_loadXML(filename, nullptr, loadError, kErrorLength);
+      if (!param::config.payload_enabled)
+      {
+        mnew = mj_loadXML(filename, nullptr, loadError, kErrorLength);
+      }
+      else
+      {
+        mjSpec* spec = mj_parseXML(
+            filename, nullptr, loadError, kErrorLength);
+        std::optional<payload::Sample> payload_sample;
+        if (spec)
+        {
+          try
+          {
+            payload_sample = payload::AddRandomFixedPayload(
+                spec, param::config.max_payload_count);
+          }
+          catch (const std::exception& error)
+          {
+            mju::strcpy_arr(loadError, error.what());
+          }
+        }
+        if (spec && !loadError[0])
+        {
+          mnew = mj_compile(spec, nullptr);
+          const char* compile_error = mjs_getError(spec);
+          if (compile_error && compile_error[0])
+          {
+            mju::strcpy_arr(loadError, compile_error);
+          }
+        }
+        if (spec)
+        {
+          mj_deleteSpec(spec);
+        }
+        if (mnew && payload_sample)
+        {
+          std::printf(
+              "[INFO] Payload sampled %d of at most %d blocks; "
+              "added mass %.2f kg including basket.\n",
+              payload_sample->count,
+              param::config.max_payload_count,
+              payload_sample->total_added_mass_kg);
+        }
+      }
       // remove trailing newline character from loadError
       if (loadError[0])
       {
@@ -759,6 +814,11 @@ void PhysicsThread(mj::Simulate *sim, const char *filename, bool viewer_enabled)
         }
         param::config.band_attached_link = 6 * body_id;
         robot_bridge = CreateRos2Bridge(robot_node, m, d);
+        if (mj_name2id(m, mjOBJ_BODY, "base_link") >= 0)
+        {
+          inertial_gt_publisher =
+              std::make_unique<inertial_gt::Publisher>(robot_node, m);
+        }
         if (param::config.beam_monitor)
         {
           auto monitor = std::make_unique<BeamEpisodeMonitor>(m);
@@ -806,6 +866,7 @@ void PhysicsThread(mj::Simulate *sim, const char *filename, bool viewer_enabled)
   }
   free(ctrlnoise);
   ctrlnoise = nullptr;
+  inertial_gt_publisher.reset();
   beam_episode_monitor.reset();
   mj_deleteData(d);
   mj_deleteModel(m);

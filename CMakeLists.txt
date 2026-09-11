@@ -12,6 +12,7 @@ find_package(geometry_msgs REQUIRED)
 find_package(rclcpp REQUIRED)
 find_package(rosidl_default_generators REQUIRED)
 find_package(sensor_msgs REQUIRED)
+find_package(std_msgs REQUIRED)
 find_package(tf2_ros REQUIRED)
 find_package(unitree_go REQUIRED)
 find_package(unitree_hg REQUIRED)
@@ -46,6 +47,8 @@ add_executable(unitree_mujoco
   simulate/src/depth_camera.cc
   simulate/src/depth_noise.cc
   simulate/src/episode_manager.cc
+  simulate/src/inertial_gt.cc
+  simulate/src/payload.cc
   simulate/src/ros2_bridge.cc
   simulate/src/joystick/joystick.cc
   simulate/src/lodepng/lodepng.cpp
@@ -66,6 +69,7 @@ ament_target_dependencies(unitree_mujoco
   geometry_msgs
   rclcpp
   sensor_msgs
+  std_msgs
   tf2_ros
   unitree_go
   unitree_hg

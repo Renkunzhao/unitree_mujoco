@@ -162,9 +162,20 @@ cd /home/rkz/code/unitree_ws
 source src/unitree_lowlevel/scripts/setup.sh lo jazzy
 ros2 run unitree_mujoco unitree_mujoco \
   -r go2 -s scene_bridge.xml --depth-camera \
+  --max-payload-count 12 \
   --depth-noise-config \
-  /home/rkz/code/unitree_ws/src/legged_rl_deploy/policies/go2/unitree_rl_mjlab/beam_depth_distillation/depth_image_noise.yaml
+  /path/to/depth_image_noise.yaml
 ```
+
+`--max-payload-count N` 在加载 XML 模型时从 `0..N` 均匀采样 payload 数量，
+并使用与 MJLab Beam payload 配置相同的 `1 kg`、`0.15 x 0.08 x 0.03 m`
+方块和篮筐惯量生成无悬空的随机堆叠。方块不含 joint，相对 `base_link`
+固定不动。网格为 2×3 列，每列最多 6 层，与训练一致；参数范围为 `0..36`。
+篮筐使用与训练完全相同的开口长方体网格，尺寸为 0.30×0.24×0.15 m。
+
+对于 Go2 模型，仿真器会以 50 Hz 在 `/unitree_go2/inertial_delta` 发布合成后的
+base-link 惯量参数增量，消息类型为 `std_msgs/msg/Float32MultiArray`。10 个值的
+Log-Cholesky 顺序和 nominal 模型差分与 MJLab Beam GT observation 完全一致。
 
 机器人 bridge 和相机共用一个 ROS 2 context。`ROS_DOMAIN_ID`、RMW 和网卡只由
 source 后的环境决定；以上命令使两者都在 domain 0、`lo` 网卡上使用 CycloneDDS。

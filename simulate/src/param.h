@@ -101,6 +101,8 @@ inline struct SimulationConfig
     bool no_joystick = false;
     bool beam_monitor = false;
     double episode_timeout_s = 20.0;
+    bool payload_enabled = false;
+    int max_payload_count = 0;
 
     DepthCameraConfig depth_camera;
 
@@ -219,16 +221,24 @@ inline po::variables_map helper(int argc, char** argv)
          "Disable the configured physical joystick publisher")
         ("beam-monitor", po::bool_switch(&config.beam_monitor),
          "Enable ground-truth beam episode monitoring")
+        ("max-payload-count", po::value<int>(&config.max_payload_count),
+         "Add a basket and sample a fixed payload count uniformly from 0 through N")
         ("episode-timeout", po::value<double>(&config.episode_timeout_s),
          "Episode timeout in simulation seconds");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
+    config.payload_enabled = vm.count("max-payload-count") > 0;
 
     if (!std::isfinite(config.episode_timeout_s) || config.episode_timeout_s <= 0.0)
     {
         throw std::runtime_error("--episode-timeout must be finite and positive");
+    }
+    if (config.payload_enabled &&
+        (config.max_payload_count < 0 || config.max_payload_count > 36))
+    {
+        throw std::runtime_error("--max-payload-count must lie in [0, 36]");
     }
     if (!config.depth_camera.noise_config_path.empty() &&
         !config.depth_camera.noise_config_path.is_absolute())

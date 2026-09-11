@@ -1,0 +1,9 @@
+<mujoco model="go2 payload">
+  <include file="go2.xml"/>
+
+  <asset>
+    <material name="basket" rgba="0.45 0.45 0.42 0.75"/>
+    <material name="payload" rgba="0.15 0.22 0.3 1"/>
+    <mesh name="basket" file="basket.obj"/>
+  </asset>
+</mujoco>

@@ -1,0 +1,24 @@
+# Open rectangular basket in the basket body frame.
+# Length: 0.30 m; width: 0.24 m; height: 0.15 m.
+v -0.1500 -0.1200 -0.075
+v  0.1500 -0.1200 -0.075
+v  0.1500  0.1200 -0.075
+v -0.1500  0.1200 -0.075
+v -0.1500 -0.1200  0.075
+v  0.1500 -0.1200  0.075
+v  0.1500  0.1200  0.075
+v -0.1500  0.1200  0.075
+
+# Bottom, outward normal toward -Z.
+f 1 4 3
+f 1 3 2
+
+# Four outward-facing sides; the top remains open.
+f 1 2 6
+f 1 6 5
+f 2 3 7
+f 2 7 6
+f 3 4 8
+f 3 8 7
+f 4 1 5
+f 4 5 8

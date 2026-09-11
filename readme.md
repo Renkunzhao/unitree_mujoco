@@ -168,9 +168,23 @@ cd /home/rkz/code/unitree_ws
 source src/unitree_lowlevel/scripts/setup.sh lo jazzy
 ros2 run unitree_mujoco unitree_mujoco \
   -r go2 -s scene_bridge.xml --depth-camera \
+  --max-payload-count 12 \
   --depth-noise-config \
-  /home/rkz/code/unitree_ws/src/legged_rl_deploy/policies/go2/unitree_rl_mjlab/beam_depth_distillation/depth_image_noise.yaml
+  /path/to/depth_image_noise.yaml
 ```
+
+`--max-payload-count N` samples an integer payload count uniformly from `0`
+through `N` when the XML model is loaded. It creates a fixed, gap-free random
+stack using the same `1 kg`, `0.15 x 0.08 x 0.03 m` blocks and basket inertia as
+the MJLab Beam payload configuration. The sampled blocks have no joints and do
+not move relative to `base_link`. The grid has 2 x 3 columns with up to 6 layers
+per column, matching training; the supported range is `0` through `36`.
+The open rectangular basket mesh is identical to training: 0.30 x 0.24 x 0.15 m.
+
+For Go2 models, the simulator publishes the resulting base-link inertial
+parameter delta at 50 Hz on `/unitree_go2/inertial_delta` as a
+`std_msgs/msg/Float32MultiArray`. The 10 values use the same Log-Cholesky order
+and nominal-model subtraction as the MJLab Beam GT observation.
 
 The robot bridge and camera use the same ROS 2 context. `ROS_DOMAIN_ID`, RMW,
 and network selection come only from the sourced environment; with the setup
