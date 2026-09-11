@@ -173,7 +173,15 @@ ros2 run unitree_mujoco unitree_mujoco \
   /path/to/depth_image_noise.yaml
 ```
 
-`--max-payload-count N` samples an integer payload count uniformly from `0`
+`config.yaml` references beam settings through `eval: "eval_beam.yaml"`.
+The path is relative to `config.yaml` (absolute paths also work); `eval: ""`
+skips the evaluation file. `eval_beam.yaml` sets `robot_scene`, `beam_monitor`,
+`episode_timeout_s`, `max_payload_count`, `payload_mode`, and `payload_seed`.
+Camera settings, `no_viewer`, and `use_joystick` stay in `config.yaml`. Explicit
+CLI arguments override YAML; boolean flags accept `=false`. Rebuild/install
+after changing source configuration files.
+
+`max_payload_count: N` samples an integer payload count uniformly from `0`
 through `N` when the XML model is loaded. It creates a fixed, gap-free random
 stack using the same `1 kg`, `0.15 x 0.08 x 0.03 m` blocks and basket inertia as
 the MJLab Beam payload configuration. The sampled blocks have no joints and do
@@ -181,10 +189,22 @@ not move relative to `base_link`. The grid has 2 x 3 columns with up to 6 layers
 per column, matching training; the supported range is `0` through `36`.
 The open rectangular basket mesh is identical to training: 0.30 x 0.24 x 0.15 m.
 
+`payload_mode: fixed` retains the startup sample; `resample` draws a new count
+and layout on every `ResetEpisode`, and requires `beam_monitor: true`.
+Consecutive samples may match. `payload_seed` controls a separate random stream:
+startup consumes the first sample, followed by one sample per resampling reset.
+`max_payload_count: 0` keeps the 0.76 kg basket; omit the count and select
+`fixed` to disable the basket and blocks. Payload details are logged with each
+episode id. The viewer's built-in state reset does not resample payloads.
+
+`episode_timeout_s` counts simulation time after `StartEpisode` and reports
+`TIMEOUT` if no task result occurs first. The evaluator performs the next reset.
+
 For Go2 models, the simulator publishes the resulting base-link inertial
 parameter delta at 50 Hz on `/unitree_go2/inertial_delta` as a
 `std_msgs/msg/Float32MultiArray`. The 10 values use the same Log-Cholesky order
-and nominal-model subtraction as the MJLab Beam GT observation.
+and nominal-model subtraction as the MJLab Beam GT observation. Resampling
+updates the dynamics, visible blocks, and published inertial delta together.
 
 The robot bridge and camera use the same ROS 2 context. `ROS_DOMAIN_ID`, RMW,
 and network selection come only from the sourced environment; with the setup

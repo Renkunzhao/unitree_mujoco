@@ -1,5 +1,7 @@
 robot: "go2"  # Robot name, "go2", "b2", "b2w", "h1", "go2w", "g1"
 robot_scene: "scene.xml" # Robot scene, /unitree_robots/[robot]/scene.xml 
+eval: "eval_beam.yaml" # Relative to this file; "" disables the evaluation configuration.
+no_viewer: false # Keep the interactive viewer; use true for automated runs.
 
 use_joystick: 1 # Simulate Unitree WirelessController using a gamepad
 joystick_type: "xbox" # support "xbox" and "switch" gamepad layout
@@ -37,7 +39,7 @@ depth_camera:
     profile: "calibrated_424x240_60"
 
   # May be overridden with --depth-noise-config. A nonempty path must be absolute.
-  noise_config_path: "path/to/depth_noise_config.yaml"
+  noise_config_path: "/home/rkz/code/unitree_ws/src/legged_rl_deploy/policies/go2/unitree_rl_mjlab/beam_depth_distillation/depth_image_noise.yaml"
 
   ros:
     camera_link_frame_id: "camera_link"

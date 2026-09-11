@@ -99,6 +99,7 @@ install(TARGETS unitree_mujoco jstest
 )
 install(FILES
   simulate/config.yaml
+  simulate/eval_beam.yaml
   simulate/camera_profiles.yaml
   DESTINATION share/${PROJECT_NAME}/config
 )

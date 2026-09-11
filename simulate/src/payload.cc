@@ -79,17 +79,11 @@ std::array<double, 3> BoxInertia(
 
 }  // namespace
 
-Sample AddRandomFixedPayload(mjSpec* spec, int max_payload_count)
+void AddPayloadSlots(mjSpec* spec)
 {
     if (!spec)
     {
         throw std::invalid_argument("Payload requires a non-null mjSpec.");
-    }
-    if (max_payload_count < 0 || max_payload_count > kCapacity)
-    {
-        throw std::invalid_argument(
-            "max_payload_count must lie in [0, " +
-            std::to_string(kCapacity) + "].");
     }
     mjsBody* base_link = mjs_findBody(spec, "base_link");
     if (!base_link)
@@ -118,27 +112,6 @@ Sample AddRandomFixedPayload(mjSpec* spec, int max_payload_count)
     mjs_setString(basket_geom->meshname, "basket");
     mjs_setString(basket_geom->material, "basket");
 
-    std::mt19937 random_engine(std::random_device{}());
-    std::uniform_int_distribution<int> count_distribution(
-        0, max_payload_count);
-    const int payload_count = count_distribution(random_engine);
-    std::array<int, kColumnCount> column_heights{};
-    for (int item = 0; item < payload_count; ++item)
-    {
-        std::vector<int> available_columns;
-        available_columns.reserve(kColumnCount);
-        for (int column = 0; column < kColumnCount; ++column)
-        {
-            if (column_heights[column] < kLayers)
-            {
-                available_columns.push_back(column);
-            }
-        }
-        std::uniform_int_distribution<std::size_t> column_distribution(
-            0, available_columns.size() - 1);
-        ++column_heights[available_columns[column_distribution(random_engine)]];
-    }
-
     const std::array<double, 3> item_inertia =
         BoxInertia(kItemMassKg, kItemDimensionsM);
     int item_index = 0;
@@ -150,7 +123,7 @@ Sample AddRandomFixedPayload(mjSpec* spec, int max_payload_count)
                          kBasketBottomDimensionsM[0] / 2.0;
         const double y = (y_index + 0.5) * kItemDimensionsM[1] -
                          kBasketBottomDimensionsM[1] / 2.0;
-        for (int layer = 0; layer < column_heights[column]; ++layer)
+        for (int layer = 0; layer < kLayers; ++layer)
         {
             const double z = kBasketBottomZM +
                              (layer + 0.5) * kItemDimensionsM[2];
@@ -176,8 +149,60 @@ Sample AddRandomFixedPayload(mjSpec* spec, int max_payload_count)
             mjs_setString(geom->material, "payload");
         }
     }
+}
 
-    return {payload_count, kBasketMassKg + payload_count * kItemMassKg};
+Sample SamplePayload(int max_payload_count, std::mt19937& random_engine)
+{
+    if (max_payload_count < 0 || max_payload_count > kCapacity)
+    {
+        throw std::invalid_argument("max_payload_count must lie in [0, 36].");
+    }
+    std::uniform_int_distribution<int> count_distribution(
+        0, max_payload_count);
+    const int payload_count = count_distribution(random_engine);
+    std::array<int, kColumnCount> column_heights{};
+    for (int item = 0; item < payload_count; ++item)
+    {
+        std::vector<int> available_columns;
+        available_columns.reserve(kColumnCount);
+        for (int column = 0; column < kColumnCount; ++column)
+        {
+            if (column_heights[column] < kLayers)
+            {
+                available_columns.push_back(column);
+            }
+        }
+        std::uniform_int_distribution<std::size_t> column_distribution(
+            0, available_columns.size() - 1);
+        ++column_heights[available_columns[column_distribution(random_engine)]];
+    }
+
+    return {payload_count, kBasketMassKg + payload_count * kItemMassKg, column_heights};
+}
+
+void ApplyPayload(mjModel* model, const Sample& sample)
+{
+    const auto item_inertia = BoxInertia(kItemMassKg, kItemDimensionsM);
+    for (int column = 0; column < kColumnCount; ++column)
+    {
+        for (int layer = 0; layer < kLayers; ++layer)
+        {
+            const std::string name = "payload_" + std::to_string(column * kLayers + layer);
+            const int body = mj_name2id(model, mjOBJ_BODY, name.c_str());
+            const int geom = mj_name2id(model, mjOBJ_GEOM, (name + "_visual").c_str());
+            if (body < 0 || geom < 0)
+            {
+                throw std::runtime_error("Missing preallocated payload slot: " + name);
+            }
+            const bool active = layer < sample.column_heights[column];
+            model->body_mass[body] = active ? kItemMassKg : 0.0;
+            for (int axis = 0; axis < 3; ++axis)
+            {
+                model->body_inertia[3 * body + axis] = active ? item_inertia[axis] : 0.0;
+            }
+            model->geom_rgba[4 * geom + 3] = active ? 1.0f : 0.0f;
+        }
+    }
 }
 
 }  // namespace payload

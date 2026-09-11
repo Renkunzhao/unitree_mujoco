@@ -72,8 +72,9 @@ bool IsBigEndian()
 }
 }  // namespace
 
-DepthCameraPublisher::DepthCameraPublisher(rclcpp::Node::SharedPtr node, param::DepthCameraConfig config)
-    : node_(std::move(node)), config_(std::move(config))
+DepthCameraPublisher::DepthCameraPublisher(
+    rclcpp::Node::SharedPtr node, param::DepthCameraConfig config, std::mutex& model_mutex)
+    : node_(std::move(node)), config_(std::move(config)), model_mutex_(model_mutex)
 {
   if (!config_.noise_config_path.empty())
   {
@@ -530,8 +531,11 @@ void DepthCameraPublisher::RenderingLoop()
 void DepthCameraPublisher::RenderAndPublish(
     mjData* data, const builtin_interfaces::msg::Time& stamp, std::uint64_t generation)
 {
-  mjv_updateScene(
-      model_, data, &render_option_, nullptr, &render_camera_, mjCAT_ALL, &render_scene_);
+  {
+    std::lock_guard<std::mutex> lock(model_mutex_);
+    mjv_updateScene(
+        model_, data, &render_option_, nullptr, &render_camera_, mjCAT_ALL, &render_scene_);
+  }
   mjr_render(viewport_, &render_scene_, &render_context_);
   mjr_readPixels(nullptr, raw_depth_.data(), viewport_, &render_context_);
 

@@ -50,7 +50,8 @@ public:
     builtin_interfaces::msg::Time stamp;
   };
 
-  DepthCameraPublisher(rclcpp::Node::SharedPtr node, param::DepthCameraConfig config);
+  DepthCameraPublisher(
+      rclcpp::Node::SharedPtr node, param::DepthCameraConfig config, std::mutex& model_mutex);
   ~DepthCameraPublisher();
 
   DepthCameraPublisher(const DepthCameraPublisher&) = delete;
@@ -78,6 +79,7 @@ private:
   param::DepthCameraConfig config_;
 
   const mjModel* model_ = nullptr;
+  std::mutex& model_mutex_;
   int camera_id_ = -1;
 
   rclcpp::Publisher<sensor_msgs::msg::Image>::SharedPtr depth_publisher_;

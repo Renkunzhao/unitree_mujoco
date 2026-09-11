@@ -120,6 +120,9 @@ namespace
   std::unique_ptr<BeamEpisodeMonitor> beam_episode_monitor;
   std::unique_ptr<EpisodeManager> episode_manager;
   std::unique_ptr<inertial_gt::Publisher> inertial_gt_publisher;
+  std::mutex model_mutex;
+  std::mt19937 payload_random;
+  std::optional<payload::Sample> current_payload;
   std::atomic_bool physics_failed{false};
 
   using Seconds = std::chrono::duration<double>;
@@ -285,6 +288,20 @@ namespace
 
   //------------------------------------------- simulation -------------------------------------------
 
+  void LogPayload(std::uint64_t episode_id)
+  {
+    const auto& sample = *current_payload;
+    const auto& heights = sample.column_heights;
+    RCLCPP_INFO(
+        robot_node->get_logger(),
+        "Payload episode=%llu mode=%s seed=%lld count=%d max=%d added_mass_kg=%.2f "
+        "column_heights=[%d,%d,%d,%d,%d,%d]",
+        static_cast<unsigned long long>(episode_id), param::config.payload_mode.c_str(),
+        static_cast<long long>(param::config.payload_seed), sample.count,
+        *param::config.max_payload_count, sample.total_added_mass_kg,
+        heights[0], heights[1], heights[2], heights[3], heights[4], heights[5]);
+  }
+
   mjModel *LoadModel(const char *file, mj::Simulate &sim)
   {
     // this copy is needed so that the mju::strlen call below compiles
@@ -304,7 +321,7 @@ namespace
         !std::strncmp(filename + mju::strlen_arr(filename) - 4, ".mjb",
                       mju::sizeof_arr(filename) - mju::strlen_arr(filename) + 4))
     {
-      if (param::config.payload_enabled)
+      if (param::config.max_payload_count)
       {
         mju::strcpy_arr(
             loadError,
@@ -321,7 +338,7 @@ namespace
     }
     else
     {
-      if (!param::config.payload_enabled)
+      if (!param::config.max_payload_count)
       {
         mnew = mj_loadXML(filename, nullptr, loadError, kErrorLength);
       }
@@ -329,13 +346,11 @@ namespace
       {
         mjSpec* spec = mj_parseXML(
             filename, nullptr, loadError, kErrorLength);
-        std::optional<payload::Sample> payload_sample;
         if (spec)
         {
           try
           {
-            payload_sample = payload::AddRandomFixedPayload(
-                spec, param::config.max_payload_count);
+            payload::AddPayloadSlots(spec);
           }
           catch (const std::exception& error)
           {
@@ -355,14 +370,27 @@ namespace
         {
           mj_deleteSpec(spec);
         }
-        if (mnew && payload_sample)
+        if (mnew)
         {
-          std::printf(
-              "[INFO] Payload sampled %d of at most %d blocks; "
-              "added mass %.2f kg including basket.\n",
-              payload_sample->count,
-              param::config.max_payload_count,
-              payload_sample->total_added_mass_kg);
+          try
+          {
+            current_payload = payload::SamplePayload(*param::config.max_payload_count, payload_random);
+            payload::ApplyPayload(mnew, *current_payload);
+            const std::unique_ptr<mjData, decltype(&mj_deleteData)> scratch(
+                mj_makeData(mnew), mj_deleteData);
+            if (!scratch)
+            {
+              throw std::runtime_error("Failed to allocate payload initialization data");
+            }
+            mj_setConst(mnew, scratch.get());
+            LogPayload(0);
+          }
+          catch (const std::exception& error)
+          {
+            mju::strcpy_arr(loadError, error.what());
+            mj_deleteModel(mnew);
+            mnew = nullptr;
+          }
         }
       }
       // remove trailing newline character from loadError
@@ -416,6 +444,15 @@ namespace
     {
       try
       {
+        // Physics/viewer already hold sim.mtx; also exclude the depth renderer.
+        std::lock_guard<std::mutex> model_lock(model_mutex);
+        if (param::config.payload_mode == "resample")
+        {
+          current_payload = payload::SamplePayload(*param::config.max_payload_count, payload_random);
+          payload::ApplyPayload(m, *current_payload);
+          mj_setConst(m, d);
+          inertial_gt_publisher->Update(m);
+        }
         mj_resetData(m, d);
         const int base_qpos_address = episode_manager->base_qpos_address();
         d->qpos[base_qpos_address] += request->base_x_offset;
@@ -449,6 +486,10 @@ namespace
             depth_camera ? depth_camera->ResetAndCapture(d, reset_stamp) : 0;
         const std::uint64_t episode_id =
             episode_manager->Reset(d, reset_stamp, depth_generation);
+        if (current_payload)
+        {
+          LogPayload(episode_id);
+        }
         episode_manager->CompleteReset(true, "episode reset complete", episode_id, reset_stamp);
         sim.speed_changed = true;
         reset_applied = true;
@@ -963,6 +1004,7 @@ int main(int argc, char **argv)
       argument_pointers.push_back(argument.data());
     }
     param::helper(static_cast<int>(argument_pointers.size()), argument_pointers.data());
+    payload_random.seed(static_cast<std::uint32_t>(param::config.payload_seed));
     if (param::config.robot_scene.is_relative())
     {
       param::config.robot_scene = share_directory / "unitree_robots" /
@@ -975,7 +1017,7 @@ int main(int argc, char **argv)
       const auto camera_options = rclcpp::NodeOptions().use_global_arguments(false);
       camera_node = std::make_shared<rclcpp::Node>("camera", "/camera", camera_options);
       depth_camera =
-          std::make_unique<DepthCameraPublisher>(camera_node, param::config.depth_camera);
+          std::make_unique<DepthCameraPublisher>(camera_node, param::config.depth_camera, model_mutex);
     }
   }
   catch (const std::exception& error)

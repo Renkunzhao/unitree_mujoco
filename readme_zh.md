@@ -167,15 +167,33 @@ ros2 run unitree_mujoco unitree_mujoco \
   /path/to/depth_image_noise.yaml
 ```
 
-`--max-payload-count N` 在加载 XML 模型时从 `0..N` 均匀采样 payload 数量，
+`config.yaml` 使用 `eval: "eval_beam.yaml"` 引用 beam 配置文件，相对路径按
+`config.yaml` 所在目录解析，也支持绝对路径；`eval: ""` 表示不加载评测配置。
+`eval_beam.yaml` 集中设置 `robot_scene`、`beam_monitor`、`episode_timeout_s`、
+`max_payload_count`、`payload_mode` 和 `payload_seed`。相机、`no_viewer` 和
+`use_joystick` 仍放在主配置中。显式命令行参数覆盖 YAML，布尔选项支持
+`=false`。修改源码中的配置后需重新构建安装。
+
+`max_payload_count: N` 在加载 XML 模型时从 `0..N` 均匀采样 payload 数量，
 并使用与 MJLab Beam payload 配置相同的 `1 kg`、`0.15 x 0.08 x 0.03 m`
 方块和篮筐惯量生成无悬空的随机堆叠。方块不含 joint，相对 `base_link`
 固定不动。网格为 2×3 列，每列最多 6 层，与训练一致；参数范围为 `0..36`。
 篮筐使用与训练完全相同的开口长方体网格，尺寸为 0.30×0.24×0.15 m。
 
+`payload_mode: fixed` 保持启动时的数量和布局；`resample` 在每次 `ResetEpisode`
+时重新采样，需要 `beam_monitor: true`，相邻样本允许相同。`payload_seed` 控制
+独立的随机序列：启动消耗第一个样本，之后每次重新采样的 reset 消耗下一个。
+`max_payload_count: 0` 保留 0.76 kg 空篮子；省略数量并选择 `fixed` 才会禁用
+篮子和负载。每轮负载详情随 episode id 写入仿真日志。视窗自带的状态 reset
+按钮不触发负载重新采样。
+
+`episode_timeout_s` 从 `StartEpisode` 开始按仿真时间计时，到期且尚无任务结果
+时报告 `TIMEOUT`，后续 reset 由评测脚本执行。
+
 对于 Go2 模型，仿真器会以 50 Hz 在 `/unitree_go2/inertial_delta` 发布合成后的
 base-link 惯量参数增量，消息类型为 `std_msgs/msg/Float32MultiArray`。10 个值的
 Log-Cholesky 顺序和 nominal 模型差分与 MJLab Beam GT observation 完全一致。
+重新采样时会同步更新动力学、可见负载和惯性真值。
 
 机器人 bridge 和相机共用一个 ROS 2 context。`ROS_DOMAIN_ID`、RMW 和网卡只由
 source 后的环境决定；以上命令使两者都在 domain 0、`lo` 网卡上使用 CycloneDDS。

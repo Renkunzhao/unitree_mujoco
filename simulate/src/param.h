@@ -3,8 +3,11 @@
 #include <array>
 #include <cmath>
 #include <cstdlib>
+#include <cstdint>
 #include <filesystem>
 #include <iostream>
+#include <limits>
+#include <optional>
 #include <stdexcept>
 #include <string>
 
@@ -101,8 +104,9 @@ inline struct SimulationConfig
     bool no_joystick = false;
     bool beam_monitor = false;
     double episode_timeout_s = 20.0;
-    bool payload_enabled = false;
-    int max_payload_count = 0;
+    std::optional<int> max_payload_count;
+    std::string payload_mode = "fixed";
+    std::int64_t payload_seed = 42;
 
     DepthCameraConfig depth_camera;
 
@@ -119,6 +123,22 @@ inline struct SimulationConfig
             joystick_bits = cfg["joystick_bits"].as<int>();
             print_scene_information = cfg["print_scene_information"].as<int>();
             enable_elastic_band = cfg["enable_elastic_band"].as<int>();
+            no_viewer = cfg["no_viewer"].as<bool>();
+
+            const auto eval_path = cfg["eval"].as<std::string>();
+            if (!eval_path.empty())
+            {
+                const auto eval = YAML::LoadFile((filename.parent_path() / eval_path).string());
+                robot_scene = eval["robot_scene"].as<std::string>();
+                beam_monitor = eval["beam_monitor"].as<bool>();
+                episode_timeout_s = eval["episode_timeout_s"].as<double>();
+                if (eval["max_payload_count"])
+                {
+                    max_payload_count = eval["max_payload_count"].as<int>();
+                }
+                payload_mode = eval["payload_mode"].as<std::string>();
+                payload_seed = eval["payload_seed"].as<std::int64_t>();
+            }
 
             const auto camera = cfg["depth_camera"];
             depth_camera.enabled = camera["enabled"].as<bool>();
@@ -215,30 +235,51 @@ inline po::variables_map helper(int argc, char** argv)
          "Enable the configured ROS 2 depth camera")
         ("depth-noise-config", po::value<std::filesystem::path>(&config.depth_camera.noise_config_path),
          "Absolute path to the depth image noise YAML")
-        ("no-viewer", po::bool_switch(&config.no_viewer),
+        ("no-viewer", po::value<bool>(&config.no_viewer)->implicit_value(true),
          "Run without the interactive MuJoCo viewer")
-        ("no-joystick", po::bool_switch(&config.no_joystick),
+        ("no-joystick", po::value<bool>(&config.no_joystick)->implicit_value(true),
          "Disable the configured physical joystick publisher")
-        ("beam-monitor", po::bool_switch(&config.beam_monitor),
+        ("beam-monitor", po::value<bool>(&config.beam_monitor)->implicit_value(true),
          "Enable ground-truth beam episode monitoring")
-        ("max-payload-count", po::value<int>(&config.max_payload_count),
-         "Add a basket and sample a fixed payload count uniformly from 0 through N")
+        ("max-payload-count", po::value<int>(),
+         "Add a basket and sample a payload count uniformly from 0 through N")
+        ("payload-mode", po::value<std::string>(&config.payload_mode),
+         "Payload sampling: fixed or resample on ResetEpisode")
+        ("payload-seed", po::value<std::int64_t>(&config.payload_seed),
+         "Payload random seed in [0, 4294967295]")
         ("episode-timeout", po::value<double>(&config.episode_timeout_s),
          "Episode timeout in simulation seconds");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
     po::notify(vm);
-    config.payload_enabled = vm.count("max-payload-count") > 0;
+    if (vm.count("max-payload-count"))
+    {
+        config.max_payload_count = vm["max-payload-count"].as<int>();
+    }
 
     if (!std::isfinite(config.episode_timeout_s) || config.episode_timeout_s <= 0.0)
     {
-        throw std::runtime_error("--episode-timeout must be finite and positive");
+        throw std::runtime_error("episode_timeout_s must be finite and positive");
     }
-    if (config.payload_enabled &&
-        (config.max_payload_count < 0 || config.max_payload_count > 36))
+    if (config.max_payload_count &&
+        (*config.max_payload_count < 0 || *config.max_payload_count > 36))
     {
-        throw std::runtime_error("--max-payload-count must lie in [0, 36]");
+        throw std::runtime_error("max_payload_count must lie in [0, 36]");
+    }
+    if (config.payload_mode != "fixed" && config.payload_mode != "resample")
+    {
+        throw std::runtime_error("payload_mode must be fixed or resample");
+    }
+    if (config.payload_mode == "resample" &&
+        (!config.max_payload_count || !config.beam_monitor))
+    {
+        throw std::runtime_error("payload_mode resample requires max_payload_count and beam_monitor");
+    }
+    if (config.payload_seed < 0 ||
+        config.payload_seed > std::numeric_limits<std::uint32_t>::max())
+    {
+        throw std::runtime_error("payload_seed must lie in [0, 4294967295]");
     }
     if (!config.depth_camera.noise_config_path.empty() &&
         !config.depth_camera.noise_config_path.is_absolute())

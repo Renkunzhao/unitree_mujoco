@@ -241,6 +241,11 @@ std::array<float, 10> ComputeBaseInertialDelta(const mjModel* model)
     {
         if (IsPayloadBody(mj_id2name(model, mjOBJ_BODY, body_id)))
         {
+            // Preallocated, inactive payload slots have no mass or inertia.
+            if (model->body_mass[body_id] == 0.0)
+            {
+                continue;
+            }
             components.push_back(ReadComponent(model, body_id, base_body_id));
         }
     }
@@ -266,13 +271,14 @@ Publisher::Publisher(rclcpp::Node::SharedPtr node, const mjModel* model)
     {
         throw std::invalid_argument("Inertial GT publisher requires a ROS 2 node.");
     }
-    const auto delta = ComputeBaseInertialDelta(model);
-    message_.data.assign(delta.begin(), delta.end());
     publisher_ = node->create_publisher<std_msgs::msg::Float32MultiArray>(
         kTopic,
         rclcpp::QoS(rclcpp::KeepLast(1)).reliable().durability_volatile());
-    timer_ = node->create_wall_timer(
-        kPublishPeriod, [this]() { publisher_->publish(message_); });
+    Update(model);
+    timer_ = node->create_wall_timer(kPublishPeriod, [this]() {
+        std::lock_guard<std::mutex> lock(mutex_);
+        publisher_->publish(message_);
+    });
 
     std::cout << "[INFO] Publishing base inertial GT delta on " << kTopic << ":";
     for (const float value : message_.data)
@@ -280,6 +286,14 @@ Publisher::Publisher(rclcpp::Node::SharedPtr node, const mjModel* model)
         std::cout << ' ' << value;
     }
     std::cout << '\n';
+}
+
+void Publisher::Update(const mjModel* model)
+{
+    const auto delta = ComputeBaseInertialDelta(model);
+    std::lock_guard<std::mutex> lock(mutex_);
+    message_.data.assign(delta.begin(), delta.end());
+    publisher_->publish(message_);
 }
 
 }  // namespace inertial_gt
