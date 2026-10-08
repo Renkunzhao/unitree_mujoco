@@ -116,6 +116,15 @@ The program will output the robot's pose and position information in the simulat
 ## 1. Simulation Configuration
 ### C++ Simulator
 The configuration file for the C++ simulator is located at `/simulate/config.yaml`:
+
+Pass `--config /path/to/config_trampoline.yaml` to load a different complete YAML
+instead of the installed `config/config.yaml`. Relative config paths use the current
+working directory. Explicit command-line options override the selected YAML.
+When the depth camera is enabled, the selected file's directory must contain
+`camera_profiles.yaml`. When disabled, `depth_camera: {enabled: false}` is sufficient;
+the remaining camera fields and profile catalog are not read or validated. The
+`--depth-camera` option overrides the YAML switch before loading camera settings.
+Relative `eval` paths are also resolved from the selected file's directory.
 ```yaml
 # Robot name loaded by the simulator
 # "go2", "b2", "b2w", "h1"

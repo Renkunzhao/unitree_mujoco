@@ -117,6 +117,12 @@ python3 ./test/test_unitree_sdk2.py
 ## 1. 仿真配置
 ### c++ 仿真器
 c++ 仿真器的配置文件位于 `/simulate/config.yaml` 中：
+
+使用 `--config /path/to/config_trampoline.yaml` 可加载另一份完整 YAML，替代安装目录的
+`config/config.yaml`。配置文件的相对路径按当前工作目录解析，显式命令行参数覆盖所选 YAML。
+启用深度相机时，所选配置文件的目录必须包含 `camera_profiles.yaml`。禁用时只需
+`depth_camera: {enabled: false}`，不读取或校验其余相机字段及相机配置目录文件。
+`--depth-camera` 在加载相机配置前覆盖 YAML 中的开关。`eval` 的相对路径也按所选配置的目录解析。
 ```yaml
 # 仿真器加载的机器人名称
 # "go2", "b2", "b2w", "h1"

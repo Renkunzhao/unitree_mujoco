@@ -995,7 +995,6 @@ int main(int argc, char **argv)
     arguments = rclcpp::init_and_remove_ros_arguments(argc, argv);
     const auto share_directory = std::filesystem::path(
         ament_index_cpp::get_package_share_directory("unitree_mujoco"));
-    param::config.load_from_yaml(share_directory / "config" / "config.yaml");
 
     std::vector<char*> argument_pointers;
     argument_pointers.reserve(arguments.size());
@@ -1003,7 +1002,8 @@ int main(int argc, char **argv)
     {
       argument_pointers.push_back(argument.data());
     }
-    param::helper(static_cast<int>(argument_pointers.size()), argument_pointers.data());
+    param::helper(static_cast<int>(argument_pointers.size()), argument_pointers.data(),
+                  share_directory / "config" / "config.yaml");
     payload_random.seed(static_cast<std::uint32_t>(param::config.payload_seed));
     if (param::config.robot_scene.is_relative())
     {

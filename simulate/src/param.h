@@ -110,7 +110,8 @@ inline struct SimulationConfig
 
     DepthCameraConfig depth_camera;
 
-    void load_from_yaml(const std::filesystem::path& filename)
+    void load_from_yaml(const std::filesystem::path& filename,
+                        std::optional<bool> depth_camera_override)
     {
         try
         {
@@ -141,7 +142,12 @@ inline struct SimulationConfig
             }
 
             const auto camera = cfg["depth_camera"];
-            depth_camera.enabled = camera["enabled"].as<bool>();
+            depth_camera.enabled = depth_camera_override
+                ? *depth_camera_override : camera["enabled"].as<bool>();
+            if (!depth_camera.enabled)
+            {
+                return;
+            }
             depth_camera.exclude_self = camera["exclude_self"].as<bool>();
             depth_camera.camera_name = camera["camera_name"].as<std::string>();
             depth_camera.parent_frame = camera["parent_frame"].as<std::string>();
@@ -224,11 +230,12 @@ inline struct SimulationConfig
 namespace po = boost::program_options;
 
 // This function must be called at the beginning of main().
-inline po::variables_map helper(int argc, char** argv)
+inline po::variables_map helper(int argc, char** argv, const std::filesystem::path& default_config)
 {
     po::options_description desc("Unitree Mujoco");
     desc.add_options()
         ("help,h", "Show help message")
+        ("config", po::value<std::filesystem::path>(), "Simulator YAML configuration file")
         ("robot,r", po::value<std::string>(&config.robot), "Robot type; -r go2")
         ("scene,s", po::value<std::filesystem::path>(&config.robot_scene), "Robot scene file; -s scene_terrain.xml")
         ("depth-camera", po::value<bool>(&config.depth_camera.enabled)->implicit_value(true),
@@ -252,6 +259,15 @@ inline po::variables_map helper(int argc, char** argv)
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
+    if (vm.count("help"))
+    {
+        std::cout << desc << std::endl;
+        std::exit(0);
+    }
+    config.load_from_yaml(vm.count("config")
+        ? vm["config"].as<std::filesystem::path>() : default_config,
+        vm.count("depth-camera") ? std::optional<bool>(vm["depth-camera"].as<bool>())
+                                 : std::nullopt);
     po::notify(vm);
     if (vm.count("max-payload-count"))
     {
@@ -281,7 +297,7 @@ inline po::variables_map helper(int argc, char** argv)
     {
         throw std::runtime_error("payload_seed must lie in [0, 4294967295]");
     }
-    if (!config.depth_camera.noise_config_path.empty() &&
+    if (config.depth_camera.enabled && !config.depth_camera.noise_config_path.empty() &&
         !config.depth_camera.noise_config_path.is_absolute())
     {
         throw std::runtime_error("depth noise config path must be absolute");
@@ -289,12 +305,6 @@ inline po::variables_map helper(int argc, char** argv)
     if (config.no_joystick)
     {
         config.use_joystick = 0;
-    }
-
-    if (vm.count("help"))
-    {
-        std::cout << desc << std::endl;
-        std::exit(0);
     }
 
     return vm;
