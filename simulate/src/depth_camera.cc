@@ -128,7 +128,7 @@ bool DepthCameraPublisher::ConfigureModel(mjModel* model, std::string* error)
   const auto mujoco_quaternion = MultiplyQuaternions(mount_quaternion, camera_link_to_mujoco);
 
   model->cam_mode[camera_id] = mjCAMLIGHT_FIXED;
-  model->cam_orthographic[camera_id] = 0;
+  model->cam_projection[camera_id] = mjPROJ_PERSPECTIVE;
   for (int i = 0; i < 3; ++i)
   {
     model->cam_pos[3 * camera_id + i] = config_.mount.position_m[i];

@@ -50,11 +50,11 @@ available in the same workspace or an underlay.
 
 #### mujoco
 
-Download the mujoco [release](https://github.com/google-deepmind/mujoco/releases), and extract it to the `~/.mujoco` directory;
+Download the MuJoCo [4.0.0 release](https://github.com/google-deepmind/mujoco/releases/tag/4.0.0), and extract it to the `~/.mujoco` directory.
 
 ```
 cd unitree_mujoco/simulate/
-ln -s ~/.mujoco/mujoco-3.3.6 mujoco
+ln -sfnT ~/.mujoco/mujoco-4.0.0 mujoco
 ```
 
 ### 2. Compile unitree_mujoco

@@ -40,6 +40,11 @@ if(NOT EXISTS "${MUJOCO_DIR}/include/mujoco/mujoco.h" OR
     "MuJoCo was not found at ${MUJOCO_DIR}. Set MUJOCO_DIR or create "
     "simulate/mujoco pointing to an extracted MuJoCo distribution.")
 endif()
+file(STRINGS "${MUJOCO_DIR}/include/mujoco/mujoco.h" MUJOCO_VERSION_HEADER
+  REGEX "^#define mjVERSION_HEADER ")
+if(NOT MUJOCO_VERSION_HEADER STREQUAL "#define mjVERSION_HEADER 4000000")
+  message(FATAL_ERROR "This branch requires MuJoCo 4.0.0; check MUJOCO_DIR.")
+endif()
 
 add_executable(unitree_mujoco
   simulate/src/main.cc
@@ -94,6 +99,20 @@ add_executable(jstest
   simulate/src/joystick/joystick.cc
 )
 target_include_directories(jstest PRIVATE simulate/src/joystick)
+
+if(BUILD_TESTING)
+  enable_testing()
+  add_executable(scene_smoke test/scene_smoke.cc)
+  target_include_directories(scene_smoke PRIVATE "${MUJOCO_DIR}/include")
+  target_link_libraries(scene_smoke "${MUJOCO_LIBRARY}")
+  file(GLOB scene_files CONFIGURE_DEPENDS "${CMAKE_CURRENT_SOURCE_DIR}/unitree_robots/*/scene*.xml")
+  foreach(scene IN LISTS scene_files)
+    file(RELATIVE_PATH scene_name "${CMAKE_CURRENT_SOURCE_DIR}/unitree_robots" "${scene}")
+    string(REPLACE "/" "_" scene_name "${scene_name}")
+    add_test(NAME "scene_${scene_name}" COMMAND scene_smoke "${scene}")
+  endforeach()
+endif()
+
 install(TARGETS unitree_mujoco jstest
   DESTINATION lib/${PROJECT_NAME}
 )
@@ -111,6 +130,8 @@ ament_export_dependencies(rosidl_default_runtime)
 
 get_filename_component(MUJOCO_LIBRARY_REAL "${MUJOCO_LIBRARY}" REALPATH)
 install(FILES "${MUJOCO_LIBRARY_REAL}" DESTINATION lib)
+# Remove plugins left by older distributions before installing the current set.
+install(CODE "file(REMOVE_RECURSE \"\$ENV{DESTDIR}\${CMAKE_INSTALL_PREFIX}/lib/${PROJECT_NAME}/mujoco_plugin\")")
 install(DIRECTORY "${MUJOCO_DIR}/bin/mujoco_plugin/"
   DESTINATION lib/${PROJECT_NAME}/mujoco_plugin
   FILES_MATCHING PATTERN "*.so"

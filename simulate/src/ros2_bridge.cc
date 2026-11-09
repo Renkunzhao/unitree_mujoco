@@ -579,12 +579,14 @@ std::unique_ptr<Ros2BridgeBase> CreateRos2Bridge(
   std::unique_ptr<Ros2BridgeBase> bridge;
   if (model->nu > kGoMotorCount)
   {
-    RCLCPP_INFO(node->get_logger(), "Using unitree_hg ROS 2 bridge for %d motors", model->nu);
+    RCLCPP_INFO(node->get_logger(), "Using unitree_hg ROS 2 bridge for %lld motors",
+                static_cast<long long>(model->nu));
     bridge = std::make_unique<G1Bridge>(node, model, data);
   }
   else
   {
-    RCLCPP_INFO(node->get_logger(), "Using unitree_go ROS 2 bridge for %d motors", model->nu);
+    RCLCPP_INFO(node->get_logger(), "Using unitree_go ROS 2 bridge for %lld motors",
+                static_cast<long long>(model->nu));
     bridge = std::make_unique<Go2Bridge>(node, model, data);
   }
   bridge->StartStatePublisher();

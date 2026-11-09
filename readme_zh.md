@@ -50,11 +50,11 @@ sudo apt install libyaml-cpp-dev libboost-all-dev libglfw3-dev \
 
 #### mujoco
 
-下载mujoco[安装包](https://github.com/google-deepmind/mujoco/releases), 解压到 `~/.mujoco` 目录下;
+下载 MuJoCo [4.0.0 安装包](https://github.com/google-deepmind/mujoco/releases/tag/4.0.0)，解压到 `~/.mujoco` 目录下。
 
 ```
 cd unitree_mujoco/simulate/
-ln -s ~/.mujoco/mujoco-3.3.6 mujoco
+ln -sfnT ~/.mujoco/mujoco-4.0.0 mujoco
 ```
 
 ### 2. 编译 unitree_mujoco
