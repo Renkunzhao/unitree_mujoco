@@ -1,0 +1,4 @@
+# Trampoline task overlay for a Go2 robot profile.
+#   ros2 run unitree_mujoco unitree_mujoco --config config/go2.yaml --eval config/eval_trampoline.yaml
+robot_scene: "scene_trampoline.xml" # 2 ms baseline: go2.xml, 16.514412 kg model
+episode_services: true # Reset/start services; outcomes are scored by the evaluator.

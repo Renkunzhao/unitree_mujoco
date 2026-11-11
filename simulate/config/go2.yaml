@@ -1,0 +1,50 @@
+# Go2 robot profile: hardware model, default scene, and depth-camera calibration.
+# Task selection is separate: pass a task overlay with `--eval config/eval_<task>.yaml`.
+robot: "go2"  # Robot name, "go2", "b2", "b2w", "h1", "go2w", "g1"
+robot_scene: "scene.xml" # Robot scene, /unitree_robots/[robot]/scene.xml
+eval: "" # Task overlays are selected with --eval, not stored here.
+no_viewer: false # Keep the interactive viewer; use true for automated runs.
+
+use_joystick: 1 # Simulate Unitree WirelessController using a gamepad
+joystick_type: "xbox" # support "xbox" and "switch" gamepad layout
+joystick_device: "/dev/input/js0" # Device path
+joystick_bits: 16 # Some game controllers may only have 8-bit accuracy
+
+print_scene_information: 1 # Print link, joint and sensors information of robot
+
+enable_elastic_band: 0 # Virtual spring band, used for lifting h1
+
+# Hardware camera calibration. Task overlays may set `depth_camera.enabled`
+# and `depth_camera.noise`; mount/profile/frames stay here.
+depth_camera:
+  enabled: false
+  # Go2 visual geoms use group 2 and collision geoms use group 3. Exclude both
+  # from the sensor image so the simulated camera does not see its host robot.
+  exclude_self: false
+  camera_name: "front_depth_camera"
+  parent_frame: "base_link"
+
+  # Pose of camera_link relative to base_link: translation in meters and ROS
+  # fixed-axis roll/pitch/yaw in radians. These values match the training setup;
+  # replace them with measured hardware extrinsics for a physical-camera match.
+  mount:
+    # https://github.com/unitreerobotics/unitree_ros/blob/master/robots/go2_description/urdf/go2_description.urdf front_camera_joint
+    # position_m: [0.32715, -0.00003, 0.04297]
+    # position_m: [0.32715, -0.00003, 0.06797] # 0.04297+0.025
+    # position_m: [0.32715, -0.01753, 0.06797]
+    position_m: [0.32715, 0.01747, 0.06797]
+    rpy_rad: [0.0, 0.7, 0.0] # measured from HW 0.6-0.8
+    # https://github.com/ZiwenZhuang/parkour.git
+    # position_m: [0.24, -0.0175, 0.12]
+    # rpy_rad: [0.0, 0.4, 0.0]
+
+  sensor:
+    model: "d435i"
+    profile: "calibrated_424x240_60"
+
+  ros:
+    camera_link_frame_id: "camera_link"
+    depth_frame_id: "camera_depth_frame"
+    optical_frame_id: "camera_depth_optical_frame"
+    depth_topic: "/camera/depth/image_rect_raw"
+    camera_info_topic: "/camera/depth/camera_info"

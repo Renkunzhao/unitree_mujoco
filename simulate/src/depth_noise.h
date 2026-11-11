@@ -1,10 +1,11 @@
 #pragma once
 
 #include <cstdint>
-#include <filesystem>
 #include <random>
 #include <string>
 #include <vector>
+
+#include <yaml-cpp/yaml.h>
 
 class DepthNoiseSimulator
 {
@@ -17,7 +18,7 @@ public:
     double depth_scale_m = 0.0;
   };
 
-  DepthNoiseSimulator(const std::filesystem::path& config_path, Camera camera);
+  DepthNoiseSimulator(const YAML::Node& config, Camera camera);
 
   void Reset();
   void Apply(std::vector<std::uint16_t>* depth);

@@ -5,14 +5,14 @@
 
 #include <mujoco/mujoco.h>
 
-#include "episode_result.h"
+#include "episode_monitor.h"
 
-class BeamEpisodeMonitor
+class BeamEpisodeMonitor : public EpisodeMonitor
 {
 public:
   explicit BeamEpisodeMonitor(const mjModel* model);
 
-  std::optional<TerminalResult> Update(const mjData* data) const;
+  std::optional<TerminalResult> Update(const mjData* data) const override;
 
 private:
   int RequireObject(mjtObj type, const char* name) const;

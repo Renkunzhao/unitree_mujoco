@@ -76,10 +76,10 @@ DepthCameraPublisher::DepthCameraPublisher(
     rclcpp::Node::SharedPtr node, param::DepthCameraConfig config, std::mutex& model_mutex)
     : node_(std::move(node)), config_(std::move(config)), model_mutex_(model_mutex)
 {
-  if (!config_.noise_config_path.empty())
+  if (config_.noise && config_.noise.IsMap())
   {
     depth_noise_ = std::make_unique<DepthNoiseSimulator>(
-        config_.noise_config_path,
+        config_.noise,
         DepthNoiseSimulator::Camera{
             config_.profile.width,
             config_.profile.height,

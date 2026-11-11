@@ -120,9 +120,22 @@ c++ 仿真器的配置文件位于 `/simulate/config.yaml` 中：
 
 使用 `--config /path/to/config_trampoline.yaml` 可加载另一份完整 YAML，替代安装目录的
 `config/config.yaml`。配置文件的相对路径按当前工作目录解析，显式命令行参数覆盖所选 YAML。
-启用深度相机时，所选配置文件的目录必须包含 `camera_profiles.yaml`。禁用时只需
+启用深度相机时，所选配置文件的目录或其上一级目录必须包含 `camera_profiles.yaml`。禁用时只需
 `depth_camera: {enabled: false}`，不读取或校验其余相机字段及相机配置目录文件。
 `--depth-camera` 在加载相机配置前覆盖 YAML 中的开关。`eval` 的相对路径也按所选配置的目录解析。
+
+`episode_services: true` 可在没有仿真内监控器时启用 `/unitree_mujoco/reset_episode`、
+`start_episode` 和 `episode_status`。Reset 恢复模型默认状态，start 开始回合计时；
+任务结果由客户端判定。
+
+`episode_monitor: <name>` 选择仿真内任务监控器；内置只有 `beam`，留空表示不监控。
+默认 `config.yaml` 使用 `eval: ""`，因此普通启动既没有任务监控器，也不提供 reset 服务。
+
+任务选择与机器人配置分离：`--config` 选择机器人（默认 `config.yaml`，Go2 用
+`config/go2.yaml`，后者包含硬件模型和相机标定），`--eval` 应用任务覆盖。推荐蹦床
+部署基线是 `--config simulate/config/go2.yaml --eval simulate/config/eval_trampoline.yaml`：
+`scene_trampoline.xml` + `go2.xml`，2 ms、PGS、implicitfast；模型质量 16.514412 kg，源码同一行记录的
+硬件质量是 16.45 kg（`unitree_robots/go2/go2.xml:67`），两者不可与更轻的训练资产混用。
 ```yaml
 # 仿真器加载的机器人名称
 # "go2", "b2", "b2w", "h1"
@@ -153,10 +166,10 @@ C++ 仿真器可以发布与 `realsense-ros` 相同的校正后深度接口：
 表示 `camera_link` 相对 `base_link` 的位姿。设置 `exclude_self: true` 可隐藏 Go2 的视觉几何；
 碰撞几何始终不会出现在深度图中。
 
-深度图退化由 `depth_camera.noise_config_path` 指向的外部绝对路径 YAML 配置，
-`--depth-noise-config` 会覆盖该值。噪声 YAML 使用明确的 `process_order`，当前支持
-`stereo_occlusion`、`correlated_dropout` 和 `pixel_dropout`。将路径设为空字符串时发布
-无噪声的渲染深度图。
+深度图退化由 `depth_camera.noise` 内联配置，因此每个任务覆盖文件可以携带与训练分布
+匹配的噪声模型。该块使用明确的 `process_order`，支持 `stereo_occlusion`、
+`correlated_dropout` 和 `pixel_dropout`。省略 `depth_camera.noise` 时发布无噪声的
+渲染深度图。
 
 <!-- https://realsenseai.com/wp-content/uploads/2025/09/Intel-RealSense-D400-Series-Datasheet-October-2025.pdf P68 Table 3-52 -->
 启用深度相机后，主视窗会在配置的 mount 位姿中心显示一个无碰撞的
@@ -167,18 +180,18 @@ datasheet 中标称的 `75 g` 质量加入 Go2 动力学。
 cd /home/rkz/code/unitree_ws
 source src/unitree_lowlevel/scripts/setup.sh lo jazzy
 ros2 run unitree_mujoco unitree_mujoco \
-  -r go2 -s scene_bridge.xml --depth-camera \
-  --max-payload-count 12 \
-  --depth-noise-config \
-  /path/to/depth_image_noise.yaml
+  --config simulate/config/go2.yaml \
+  --eval simulate/config/eval_beam.yaml
 ```
 
-`config.yaml` 使用 `eval: "eval_beam.yaml"` 引用 beam 配置文件，相对路径按
-`config.yaml` 所在目录解析，也支持绝对路径；`eval: ""` 表示不加载评测配置。
-`eval_beam.yaml` 集中设置 `robot_scene`、`beam_monitor`、`episode_timeout_s`、
-`max_payload_count`、`payload_mode` 和 `payload_seed`。相机、`no_viewer` 和
-`use_joystick` 仍放在主配置中。显式命令行参数覆盖 YAML，布尔选项支持
-`=false`。修改源码中的配置后需重新构建安装。
+默认 `config.yaml` 使用 `eval: ""`，不加载任务配置。Beam 任务用
+`--config simulate/config/go2.yaml --eval simulate/config/eval_beam.yaml` 启动。
+YAML 里的 `eval` 字段按该文件所在目录解析；命令行 `--eval` 按当前目录解析，
+也支持绝对路径。`eval_beam.yaml` 集中设置 `robot_scene`、`episode_monitor`、
+`episode_services`、`inertial_gt`、`episode_timeout_s`、`max_payload_count`、
+`payload_mode`、`payload_seed`，以及该任务的 `depth_camera.enabled` 和噪声模型。
+相机标定（外参、型号 profile、frame、topic）留在机器人配置 `config/go2.yaml`。
+显式命令行参数覆盖 YAML，布尔选项支持 `=false`。修改源码中的配置后需重新构建安装。
 
 `max_payload_count: N` 在加载 XML 模型时从 `0..N` 均匀采样 payload 数量，
 并使用与 MJLab Beam payload 配置相同的 `1 kg`、`0.15 x 0.08 x 0.03 m`
@@ -187,7 +200,7 @@ ros2 run unitree_mujoco unitree_mujoco \
 篮筐使用与训练完全相同的开口长方体网格，尺寸为 0.30×0.24×0.15 m。
 
 `payload_mode: fixed` 保持启动时的数量和布局；`resample` 在每次 `ResetEpisode`
-时重新采样，需要 `beam_monitor: true`，相邻样本允许相同。`payload_seed` 控制
+时重新采样，需要 `episode_monitor: beam`，相邻样本允许相同。`payload_seed` 控制
 独立的随机序列：启动消耗第一个样本，之后每次重新采样的 reset 消耗下一个。
 `max_payload_count: 0` 保留 0.76 kg 空篮子；省略数量并选择 `fixed` 才会禁用
 篮子和负载。每轮负载详情随 episode id 写入仿真日志。视窗自带的状态 reset

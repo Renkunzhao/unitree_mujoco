@@ -1,0 +1,30 @@
+# Beam (bridge) task overlay for a Go2 robot profile.
+#   ros2 run unitree_mujoco unitree_mujoco --config config/go2.yaml --eval config/eval_beam.yaml
+# Explicit command-line arguments still override these values.
+robot_scene: "scene_bridge.xml"
+episode_monitor: "beam" # Ground-truth bridge outcome; empty disables monitoring.
+episode_services: true # Reset/start services for the automated evaluator.
+inertial_gt: true # Publish base-link inertial ground truth (beam observation).
+episode_timeout_s: 20.0 # Simulation seconds after StartEpisode, excluding settling.
+
+# The task turns the robot camera on and selects its training noise model.
+# Mount, sensor profile, frames and topics come from the robot config.
+# Noise models the simulated D435i stereo artifacts seen during beam training.
+# Omit `noise` to publish clean rendered depth.
+depth_camera:
+  enabled: true
+  noise:
+    seed: 42
+    process_order: [correlated_dropout, pixel_dropout]
+    correlated_dropout:
+      cell_size_px: 4
+      threshold_std: 2.65
+      temporal_correlation: 0.95
+    pixel_dropout:
+      probability: 0.002
+
+# Uniform count in 0..N; each block is 1 kg, plus the 0.76 kg basket.
+# Omit max_payload_count to disable the basket and blocks; 0 means an empty basket.
+max_payload_count: 8
+payload_mode: "resample" # fixed: retain the startup sample; resample: sample on ResetEpisode.
+payload_seed: 42 # Startup consumes the first sample; each resampling reset consumes the next.

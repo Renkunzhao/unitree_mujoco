@@ -52,6 +52,7 @@ add_executable(unitree_mujoco
   simulate/src/depth_camera.cc
   simulate/src/depth_noise.cc
   simulate/src/episode_manager.cc
+  simulate/src/episode_monitor.cc
   simulate/src/inertial_gt.cc
   simulate/src/payload.cc
   simulate/src/ros2_bridge.cc
@@ -118,7 +119,9 @@ install(TARGETS unitree_mujoco jstest
 )
 install(FILES
   simulate/config.yaml
-  simulate/eval_beam.yaml
+  simulate/config/go2.yaml
+  simulate/config/eval_beam.yaml
+  simulate/config/eval_trampoline.yaml
   simulate/camera_profiles.yaml
   DESTINATION share/${PROJECT_NAME}/config
 )

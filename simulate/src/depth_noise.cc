@@ -63,17 +63,9 @@ void RequireFinitePositive(double value, const std::string& name)
 }  // namespace
 
 DepthNoiseSimulator::DepthNoiseSimulator(
-    const std::filesystem::path& config_path, Camera camera)
+    const YAML::Node& config, Camera camera)
     : camera_(camera)
 {
-  if (!config_path.is_absolute())
-  {
-    throw std::runtime_error("depth noise config path must be absolute: " + config_path.string());
-  }
-  if (!std::filesystem::is_regular_file(config_path))
-  {
-    throw std::runtime_error("depth noise config is not a file: " + config_path.string());
-  }
   if (camera_.width <= 0 || camera_.height <= 0)
   {
     throw std::runtime_error("depth noise camera dimensions must be positive");
@@ -81,15 +73,13 @@ DepthNoiseSimulator::DepthNoiseSimulator(
   RequireFinitePositive(camera_.focal_length_px, "depth noise focal_length_px");
   RequireFinitePositive(camera_.depth_scale_m, "depth noise depth_scale_m");
 
-  const YAML::Node document = YAML::LoadFile(config_path.string());
-  RequireExactKeys(document, {"depth_image_noise"}, "depth noise document");
-  const YAML::Node root = document["depth_image_noise"];
-  RequireMapping(root, "depth_image_noise");
+  const YAML::Node& root = config;
+  RequireMapping(root, "depth_camera.noise");
 
   const YAML::Node order = root["process_order"];
   if (!order || !order.IsSequence() || order.size() == 0)
   {
-    throw std::runtime_error("depth_image_noise.process_order must be a nonempty sequence");
+    throw std::runtime_error("depth_camera.noise.process_order must be a nonempty sequence");
   }
 
   std::set<std::string> operation_names;
@@ -129,7 +119,7 @@ DepthNoiseSimulator::DepthNoiseSimulator(
     RequireExactKeys(
         cfg,
         {"baseline_m", "min_depth_jump_m", "max_width_px", "side"},
-        "depth_image_noise.stereo_occlusion");
+        "depth_camera.noise.stereo_occlusion");
     stereo_occlusion_.baseline_m = cfg["baseline_m"].as<double>();
     stereo_occlusion_.min_depth_jump_m = cfg["min_depth_jump_m"].as<double>();
     stereo_occlusion_.max_width_px = cfg["max_width_px"].as<int>();
@@ -155,7 +145,7 @@ DepthNoiseSimulator::DepthNoiseSimulator(
     RequireExactKeys(
         cfg,
         {"cell_size_px", "threshold_std", "temporal_correlation"},
-        "depth_image_noise.correlated_dropout");
+        "depth_camera.noise.correlated_dropout");
     correlated_dropout_.cell_size_px = cfg["cell_size_px"].as<int>();
     correlated_dropout_.threshold_std = cfg["threshold_std"].as<double>();
     correlated_dropout_.temporal_correlation = cfg["temporal_correlation"].as<double>();
@@ -179,7 +169,7 @@ DepthNoiseSimulator::DepthNoiseSimulator(
   if (operation_names.count("pixel_dropout"))
   {
     const YAML::Node cfg = root["pixel_dropout"];
-    RequireExactKeys(cfg, {"probability"}, "depth_image_noise.pixel_dropout");
+    RequireExactKeys(cfg, {"probability"}, "depth_camera.noise.pixel_dropout");
     pixel_dropout_.probability = cfg["probability"].as<double>();
     if (!std::isfinite(pixel_dropout_.probability) || pixel_dropout_.probability < 0.0 ||
         pixel_dropout_.probability > 1.0)
@@ -189,7 +179,7 @@ DepthNoiseSimulator::DepthNoiseSimulator(
   }
 
   std::ostringstream description;
-  description << config_path << " [";
+  description << "inline depth_camera.noise [";
   for (std::size_t i = 0; i < operation_names.size(); ++i)
   {
     if (i > 0)

@@ -39,9 +39,9 @@
 #include <rclcpp/rclcpp.hpp>
 #include "simulate.h"
 #include "array_safety.h"
-#include "beam_episode_monitor.h"
 #include "depth_camera.h"
 #include "episode_manager.h"
+#include "episode_monitor.h"
 #include "inertial_gt.h"
 #include "param.h"
 #include "payload.h"
@@ -117,7 +117,7 @@ namespace
   rclcpp::Node::SharedPtr camera_node;
   std::unique_ptr<Ros2BridgeBase> robot_bridge;
   std::unique_ptr<DepthCameraPublisher> depth_camera;
-  std::unique_ptr<BeamEpisodeMonitor> beam_episode_monitor;
+  std::unique_ptr<EpisodeMonitor> episode_monitor;
   std::unique_ptr<EpisodeManager> episode_manager;
   std::unique_ptr<inertial_gt::Publisher> inertial_gt_publisher;
   std::mutex model_mutex;
@@ -534,9 +534,9 @@ namespace
       episode_manager->UpdateDepthStatus(frame_status.generation, frame_status.stamp);
     }
     std::optional<TerminalResult> terminal_result;
-    if (episode_manager->running())
+    if (episode_manager->running() && episode_monitor)
     {
-      terminal_result = beam_episode_monitor->Update(d);
+      terminal_result = episode_monitor->Update(d);
     }
     episode_manager->Update(d, std::move(terminal_result));
   }
@@ -855,17 +855,19 @@ void PhysicsThread(mj::Simulate *sim, const char *filename, bool viewer_enabled)
         }
         param::config.band_attached_link = 6 * body_id;
         robot_bridge = CreateRos2Bridge(robot_node, m, d);
-        if (mj_name2id(m, mjOBJ_BODY, "base_link") >= 0)
+        if (param::config.inertial_gt &&
+            mj_name2id(m, mjOBJ_BODY, "base_link") >= 0)
         {
           inertial_gt_publisher =
               std::make_unique<inertial_gt::Publisher>(robot_node, m);
         }
-        if (param::config.beam_monitor)
+        if (!param::config.episode_monitor.empty() ||
+            param::config.episode_services)
         {
-          auto monitor = std::make_unique<BeamEpisodeMonitor>(m);
+          episode_monitor =
+              CreateEpisodeMonitor(param::config.episode_monitor, m);
           auto manager = std::make_unique<EpisodeManager>(
               robot_node, m, param::config.episode_timeout_s);
-          beam_episode_monitor = std::move(monitor);
           episode_manager = std::move(manager);
         }
       }
@@ -908,7 +910,7 @@ void PhysicsThread(mj::Simulate *sim, const char *filename, bool viewer_enabled)
   free(ctrlnoise);
   ctrlnoise = nullptr;
   inertial_gt_publisher.reset();
-  beam_episode_monitor.reset();
+  episode_monitor.reset();
   mj_deleteData(d);
   mj_deleteModel(m);
   d = nullptr;

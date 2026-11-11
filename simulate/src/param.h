@@ -17,6 +17,27 @@
 namespace param
 {
 
+// The camera profile catalog is a shared calibration asset, not a task file.
+// Look next to the selected config first (installed layout), then one level up
+// (source layout: simulate/config/<task>.yaml + simulate/camera_profiles.yaml).
+inline std::filesystem::path FindCameraProfiles(
+    const std::filesystem::path& config_file)
+{
+    const auto directory = config_file.parent_path();
+    for (const auto& candidate : {directory / "camera_profiles.yaml",
+                                  directory.parent_path() / "camera_profiles.yaml"})
+    {
+        std::error_code error;
+        if (std::filesystem::is_regular_file(candidate, error))
+        {
+            return candidate;
+        }
+    }
+    throw std::runtime_error(
+        "camera_profiles.yaml not found next to " + config_file.string() +
+        " or in its parent directory");
+}
+
 struct CameraMountConfig
 {
     std::array<double, 3> position_m{};
@@ -60,7 +81,8 @@ struct DepthCameraConfig
     CameraMountConfig mount;
     std::string model;
     std::string profile_name;
-    std::filesystem::path noise_config_path;
+    // Inline simulation noise model; an undefined node publishes clean depth.
+    YAML::Node noise;
     CameraProfile profile;
     CameraRosConfig ros;
 };
@@ -102,7 +124,10 @@ inline struct SimulationConfig
 
     bool no_viewer = false;
     bool no_joystick = false;
-    bool beam_monitor = false;
+    // "" disables the in-simulator monitor; "beam" selects the bridge monitor.
+    std::string episode_monitor;
+    bool episode_services = false;
+    bool inertial_gt = false;
     double episode_timeout_s = 20.0;
     std::optional<int> max_payload_count;
     std::string payload_mode = "fixed";
@@ -111,11 +136,13 @@ inline struct SimulationConfig
     DepthCameraConfig depth_camera;
 
     void load_from_yaml(const std::filesystem::path& filename,
-                        std::optional<bool> depth_camera_override)
+                        std::optional<bool> depth_camera_override,
+                        std::optional<std::filesystem::path> eval_override =
+                            std::nullopt)
     {
         try
         {
-            const auto cfg = YAML::LoadFile(filename.string());
+            auto cfg = YAML::LoadFile(filename.string());
             robot = cfg["robot"].as<std::string>();
             robot_scene = cfg["robot_scene"].as<std::string>();
             use_joystick = cfg["use_joystick"].as<int>();
@@ -125,20 +152,79 @@ inline struct SimulationConfig
             print_scene_information = cfg["print_scene_information"].as<int>();
             enable_elastic_band = cfg["enable_elastic_band"].as<int>();
             no_viewer = cfg["no_viewer"].as<bool>();
+            episode_services = cfg["episode_services"].as<bool>(false);
+            inertial_gt = cfg["inertial_gt"].as<bool>(false);
 
-            const auto eval_path = cfg["eval"].as<std::string>();
+            // The YAML `eval` field is relative to the config file; a CLI
+            // --eval path keeps normal command-line semantics (current dir).
+            std::filesystem::path eval_path;
+            if (eval_override)
+            {
+                eval_path = *eval_override;
+            }
+            else
+            {
+                eval_path = cfg["eval"].as<std::string>();
+                if (!eval_path.empty() && eval_path.is_relative())
+                {
+                    eval_path = filename.parent_path() / eval_path;
+                }
+            }
             if (!eval_path.empty())
             {
-                const auto eval = YAML::LoadFile((filename.parent_path() / eval_path).string());
-                robot_scene = eval["robot_scene"].as<std::string>();
-                beam_monitor = eval["beam_monitor"].as<bool>();
-                episode_timeout_s = eval["episode_timeout_s"].as<double>();
+                const auto eval = YAML::LoadFile(eval_path.string());
+                if (eval["robot_scene"])
+                {
+                    robot_scene = eval["robot_scene"].as<std::string>();
+                }
+                // Deprecated boolean alias for episode_monitor: beam.
+                if (eval["beam_monitor"].as<bool>(false))
+                {
+                    episode_monitor = "beam";
+                }
+                if (eval["episode_monitor"])
+                {
+                    episode_monitor = eval["episode_monitor"].as<std::string>();
+                }
+                if (eval["episode_services"])
+                {
+                    episode_services = eval["episode_services"].as<bool>();
+                }
+                if (eval["inertial_gt"])
+                {
+                    inertial_gt = eval["inertial_gt"].as<bool>();
+                }
+                if (eval["episode_timeout_s"])
+                {
+                    episode_timeout_s = eval["episode_timeout_s"].as<double>();
+                }
                 if (eval["max_payload_count"])
                 {
                     max_payload_count = eval["max_payload_count"].as<int>();
                 }
-                payload_mode = eval["payload_mode"].as<std::string>();
-                payload_seed = eval["payload_seed"].as<std::int64_t>();
+                if (eval["payload_mode"])
+                {
+                    payload_mode = eval["payload_mode"].as<std::string>();
+                }
+                if (eval["payload_seed"])
+                {
+                    payload_seed = eval["payload_seed"].as<std::int64_t>();
+                }
+                // A task may toggle the camera and its noise model, but the
+                // mount, profile, frames and topics stay with the robot config.
+                if (eval["depth_camera"])
+                {
+                    YAML::Node camera = cfg["depth_camera"];
+                    if (!camera || !camera.IsMap())
+                    {
+                        camera = YAML::Node(YAML::NodeType::Map);
+                    }
+                    for (const auto& item : eval["depth_camera"])
+                    {
+                        camera[item.first.as<std::string>()] = item.second;
+                    }
+                    cfg["depth_camera"] = camera;
+                }
             }
 
             const auto camera = cfg["depth_camera"];
@@ -157,7 +243,7 @@ inline struct SimulationConfig
                 read_array<3>(camera["mount"]["rpy_rad"], "depth_camera.mount.rpy_rad");
             depth_camera.model = camera["sensor"]["model"].as<std::string>();
             depth_camera.profile_name = camera["sensor"]["profile"].as<std::string>();
-            depth_camera.noise_config_path = camera["noise_config_path"].as<std::string>();
+            depth_camera.noise = camera["noise"];
             depth_camera.ros.camera_link_frame_id =
                 camera["ros"]["camera_link_frame_id"].as<std::string>();
             depth_camera.ros.depth_frame_id = camera["ros"]["depth_frame_id"].as<std::string>();
@@ -165,7 +251,7 @@ inline struct SimulationConfig
             depth_camera.ros.depth_topic = camera["ros"]["depth_topic"].as<std::string>();
             depth_camera.ros.camera_info_topic = camera["ros"]["camera_info_topic"].as<std::string>();
 
-            const auto catalog = YAML::LoadFile((filename.parent_path() / "camera_profiles.yaml").string());
+            const auto catalog = YAML::LoadFile(FindCameraProfiles(filename).string());
             const auto model = catalog["models"][depth_camera.model];
             if (!model)
             {
@@ -236,18 +322,20 @@ inline po::variables_map helper(int argc, char** argv, const std::filesystem::pa
     desc.add_options()
         ("help,h", "Show help message")
         ("config", po::value<std::filesystem::path>(), "Simulator YAML configuration file")
+        ("eval", po::value<std::filesystem::path>(),
+         "Task overlay YAML applied after --config (path relative to the current directory)")
         ("robot,r", po::value<std::string>(&config.robot), "Robot type; -r go2")
         ("scene,s", po::value<std::filesystem::path>(&config.robot_scene), "Robot scene file; -s scene_terrain.xml")
         ("depth-camera", po::value<bool>(&config.depth_camera.enabled)->implicit_value(true),
          "Enable the configured ROS 2 depth camera")
-        ("depth-noise-config", po::value<std::filesystem::path>(&config.depth_camera.noise_config_path),
-         "Absolute path to the depth image noise YAML")
         ("no-viewer", po::value<bool>(&config.no_viewer)->implicit_value(true),
          "Run without the interactive MuJoCo viewer")
         ("no-joystick", po::value<bool>(&config.no_joystick)->implicit_value(true),
          "Disable the configured physical joystick publisher")
-        ("beam-monitor", po::value<bool>(&config.beam_monitor)->implicit_value(true),
-         "Enable ground-truth beam episode monitoring")
+        ("episode-monitor", po::value<std::string>(&config.episode_monitor),
+         "In-simulator episode monitor: empty (none) or 'beam'")
+        ("inertial-gt", po::value<bool>(&config.inertial_gt)->implicit_value(true),
+         "Publish base-link inertial ground truth (beam observation)")
         ("max-payload-count", po::value<int>(),
          "Add a basket and sample a payload count uniformly from 0 through N")
         ("payload-mode", po::value<std::string>(&config.payload_mode),
@@ -264,10 +352,13 @@ inline po::variables_map helper(int argc, char** argv, const std::filesystem::pa
         std::cout << desc << std::endl;
         std::exit(0);
     }
-    config.load_from_yaml(vm.count("config")
-        ? vm["config"].as<std::filesystem::path>() : default_config,
+    config.load_from_yaml(
+        vm.count("config") ? vm["config"].as<std::filesystem::path>() : default_config,
         vm.count("depth-camera") ? std::optional<bool>(vm["depth-camera"].as<bool>())
-                                 : std::nullopt);
+                                 : std::nullopt,
+        vm.count("eval") ? std::optional<std::filesystem::path>(
+                               vm["eval"].as<std::filesystem::path>())
+                         : std::nullopt);
     po::notify(vm);
     if (vm.count("max-payload-count"))
     {
@@ -287,20 +378,20 @@ inline po::variables_map helper(int argc, char** argv, const std::filesystem::pa
     {
         throw std::runtime_error("payload_mode must be fixed or resample");
     }
-    if (config.payload_mode == "resample" &&
-        (!config.max_payload_count || !config.beam_monitor))
+    if (config.episode_monitor != "" && config.episode_monitor != "beam")
     {
-        throw std::runtime_error("payload_mode resample requires max_payload_count and beam_monitor");
+        throw std::runtime_error("episode_monitor must be empty or 'beam'");
+    }
+    if (config.payload_mode == "resample" &&
+        (!config.max_payload_count || config.episode_monitor != "beam"))
+    {
+        throw std::runtime_error(
+            "payload_mode resample requires max_payload_count and episode_monitor: beam");
     }
     if (config.payload_seed < 0 ||
         config.payload_seed > std::numeric_limits<std::uint32_t>::max())
     {
         throw std::runtime_error("payload_seed must lie in [0, 4294967295]");
-    }
-    if (config.depth_camera.enabled && !config.depth_camera.noise_config_path.empty() &&
-        !config.depth_camera.noise_config_path.is_absolute())
-    {
-        throw std::runtime_error("depth noise config path must be absolute");
     }
     if (config.no_joystick)
     {

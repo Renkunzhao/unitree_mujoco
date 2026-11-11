@@ -121,10 +121,29 @@ Pass `--config /path/to/config_trampoline.yaml` to load a different complete YAM
 instead of the installed `config/config.yaml`. Relative config paths use the current
 working directory. Explicit command-line options override the selected YAML.
 When the depth camera is enabled, the selected file's directory must contain
-`camera_profiles.yaml`. When disabled, `depth_camera: {enabled: false}` is sufficient;
+`camera_profiles.yaml` in the selected file's directory or its parent directory.
+When disabled, `depth_camera: {enabled: false}` is sufficient;
 the remaining camera fields and profile catalog are not read or validated. The
 `--depth-camera` option overrides the YAML switch before loading camera settings.
 Relative `eval` paths are also resolved from the selected file's directory.
+
+`episode_services: true` enables `/unitree_mujoco/reset_episode`, `start_episode`,
+and `episode_status` without an in-simulator monitor. Reset restores the model's
+default state; start arms the episode clock. Task-specific outcomes are then evaluated
+by the client.
+
+`episode_monitor: <name>` selects a task monitor; the only built-in monitor is
+`beam`, and an empty value disables monitoring. The default `config.yaml` uses
+`eval: ""`, so a plain launch has no task monitor and no reset services.
+
+Task selection is separate from the robot profile: `--config` selects the robot
+(default `config.yaml`, or `config/go2.yaml` for the Go2 hardware model and camera
+calibration) and `--eval` applies a task overlay. The recommended trampoline
+baseline is `--config simulate/config/go2.yaml --eval simulate/config/eval_trampoline.yaml`:
+`scene_trampoline.xml` with `go2.xml`, 2 ms, PGS, implicitfast. Its model
+mass is 16.514412 kg while the source comment records a hardware mass of 16.45 kg
+(`unitree_robots/go2/go2.xml:67`); this provenance is not interchangeable with the
+lighter training asset.
 ```yaml
 # Robot name loaded by the simulator
 # "go2", "b2", "b2w", "h1"
@@ -160,11 +179,11 @@ to `base_link`.
 Set `exclude_self: true` to hide the Go2 visual geoms; collision geoms are
 always excluded from the depth image.
 
-Depth image artifacts are configured by the external absolute path in
-`depth_camera.noise_config_path`. `--depth-noise-config` overrides that value.
-The noise YAML uses an explicit `process_order` and currently supports
-`stereo_occlusion`, `correlated_dropout`, and `pixel_dropout`. Set the path to
-an empty string to publish clean rendered depth.
+Depth image artifacts are configured inline by `depth_camera.noise`, so each task
+overlay can carry the noise model that matches its training distribution. The
+block uses an explicit `process_order` and supports `stereo_occlusion`,
+`correlated_dropout`, and `pixel_dropout`. Omit `depth_camera.noise` to publish
+clean rendered depth.
 
 <!-- https://realsenseai.com/wp-content/uploads/2025/09/Intel-RealSense-D400-Series-Datasheet-October-2025.pdf P68 Table 3-52 -->
 When the depth camera is enabled, the main viewer shows a non-colliding
@@ -176,19 +195,20 @@ is not added to the Go2 dynamics.
 cd /home/rkz/code/unitree_ws
 source src/unitree_lowlevel/scripts/setup.sh lo jazzy
 ros2 run unitree_mujoco unitree_mujoco \
-  -r go2 -s scene_bridge.xml --depth-camera \
-  --max-payload-count 12 \
-  --depth-noise-config \
-  /path/to/depth_image_noise.yaml
+  --config simulate/config/go2.yaml \
+  --eval simulate/config/eval_beam.yaml
 ```
 
-`config.yaml` references beam settings through `eval: "eval_beam.yaml"`.
-The path is relative to `config.yaml` (absolute paths also work); `eval: ""`
-skips the evaluation file. `eval_beam.yaml` sets `robot_scene`, `beam_monitor`,
-`episode_timeout_s`, `max_payload_count`, `payload_mode`, and `payload_seed`.
-Camera settings, `no_viewer`, and `use_joystick` stay in `config.yaml`. Explicit
-CLI arguments override YAML; boolean flags accept `=false`. Rebuild/install
-after changing source configuration files.
+The default `config.yaml` uses `eval: ""` (no task configuration). Launch the beam
+task with `--config simulate/config/go2.yaml --eval simulate/config/eval_beam.yaml`.
+An `eval` field inside a YAML file is relative to that file; a CLI `--eval` path is
+relative to the current directory (absolute paths also work).
+`eval_beam.yaml` sets `robot_scene`, `episode_monitor`, `episode_services`,
+`inertial_gt`, `episode_timeout_s`, `max_payload_count`, `payload_mode`,
+`payload_seed`, and the task's `depth_camera.enabled` / noise model.
+Camera calibration (mount, sensor profile, frames, topics) stays in the robot
+config (`config/go2.yaml`). Explicit CLI arguments override YAML; boolean flags
+accept `=false`. Rebuild/install after changing source configuration files.
 
 `max_payload_count: N` samples an integer payload count uniformly from `0`
 through `N` when the XML model is loaded. It creates a fixed, gap-free random
@@ -199,7 +219,7 @@ per column, matching training; the supported range is `0` through `36`.
 The open rectangular basket mesh is identical to training: 0.30 x 0.24 x 0.15 m.
 
 `payload_mode: fixed` retains the startup sample; `resample` draws a new count
-and layout on every `ResetEpisode`, and requires `beam_monitor: true`.
+and layout on every `ResetEpisode`, and requires `episode_monitor: beam`.
 Consecutive samples may match. `payload_seed` controls a separate random stream:
 startup consumes the first sample, followed by one sample per resampling reset.
 `max_payload_count: 0` keeps the 0.76 kg basket; omit the count and select
