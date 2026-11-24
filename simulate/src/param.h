@@ -87,6 +87,111 @@ struct DepthCameraConfig
     CameraRosConfig ros;
 };
 
+struct MotorGroupCurveConfig
+{
+    double effort_limit = 0.0;
+    double saturation_effort = 0.0;
+    double velocity_limit = 0.0;
+};
+
+struct MotorCurveConfig
+{
+    bool enabled = false;
+    std::string mode = "dc_motor";
+    double nominal_voltage_v = 28.8;
+    double bus_voltage_v = 28.8;
+    MotorGroupCurveConfig hip_thigh{23.70, 66.33, 34.64};
+    MotorGroupCurveConfig calf{45.43, 127.15, 18.07};
+};
+
+inline void load_motor_group_curve_yaml(
+    const YAML::Node& node, MotorGroupCurveConfig& group, const std::string& field_name)
+{
+    if (!node)
+    {
+        return;
+    }
+    if (!node.IsMap())
+    {
+        throw std::runtime_error(field_name + " must be a YAML map");
+    }
+    if (node["effort_limit"])
+    {
+        group.effort_limit = node["effort_limit"].as<double>();
+    }
+    if (node["saturation_effort"])
+    {
+        group.saturation_effort = node["saturation_effort"].as<double>();
+    }
+    if (node["velocity_limit"])
+    {
+        group.velocity_limit = node["velocity_limit"].as<double>();
+    }
+}
+
+inline void load_motor_curve_yaml(const YAML::Node& node, MotorCurveConfig& curve)
+{
+    if (!node)
+    {
+        return;
+    }
+    if (!node.IsMap())
+    {
+        throw std::runtime_error("motor_curve must be a YAML map");
+    }
+    if (node["enabled"])
+    {
+        curve.enabled = node["enabled"].as<bool>();
+    }
+    if (node["mode"])
+    {
+        curve.mode = node["mode"].as<std::string>();
+    }
+    if (node["nominal_voltage_v"])
+    {
+        curve.nominal_voltage_v = node["nominal_voltage_v"].as<double>();
+    }
+    if (node["bus_voltage_v"])
+    {
+        curve.bus_voltage_v = node["bus_voltage_v"].as<double>();
+    }
+    if (node["hip_thigh"])
+    {
+        load_motor_group_curve_yaml(node["hip_thigh"], curve.hip_thigh, "motor_curve.hip_thigh");
+    }
+    if (node["calf"])
+    {
+        load_motor_group_curve_yaml(node["calf"], curve.calf, "motor_curve.calf");
+    }
+}
+
+inline void validate_motor_group_curve(
+    const MotorGroupCurveConfig& group, const std::string& field_name)
+{
+    if (!std::isfinite(group.effort_limit) || group.effort_limit <= 0.0 ||
+        !std::isfinite(group.saturation_effort) || group.saturation_effort < group.effort_limit ||
+        !std::isfinite(group.velocity_limit) || group.velocity_limit <= 0.0)
+    {
+        throw std::runtime_error(
+            field_name + " must have finite positive limits and saturation_effort >= effort_limit");
+    }
+}
+
+inline void validate_motor_curve_config(const MotorCurveConfig& curve)
+{
+    if (curve.mode != "dc_motor" && curve.mode != "motoring_only")
+    {
+        throw std::runtime_error("motor_curve.mode must be 'dc_motor' or 'motoring_only'");
+    }
+    if (!std::isfinite(curve.nominal_voltage_v) || curve.nominal_voltage_v <= 0.0 ||
+        !std::isfinite(curve.bus_voltage_v) || curve.bus_voltage_v <= 0.0)
+    {
+        throw std::runtime_error("motor_curve voltages must be finite and positive");
+    }
+    validate_motor_group_curve(curve.hip_thigh, "motor_curve.hip_thigh");
+    validate_motor_group_curve(curve.calf, "motor_curve.calf");
+}
+
 template <std::size_t N>
 std::array<double, N> read_array(const YAML::Node& node, const std::string& field_name)
 {
@@ -133,6 +238,7 @@ inline struct SimulationConfig
     std::string payload_mode = "fixed";
     std::int64_t payload_seed = 42;
 
+    MotorCurveConfig motor_curve;
     DepthCameraConfig depth_camera;
 
     void load_from_yaml(const std::filesystem::path& filename,
@@ -154,6 +260,7 @@ inline struct SimulationConfig
             no_viewer = cfg["no_viewer"].as<bool>();
             episode_services = cfg["episode_services"].as<bool>(false);
             inertial_gt = cfg["inertial_gt"].as<bool>(false);
+            load_motor_curve_yaml(cfg["motor_curve"], motor_curve);
 
             // The YAML `eval` field is relative to the config file; a CLI
             // --eval path keeps normal command-line semantics (current dir).
@@ -210,6 +317,10 @@ inline struct SimulationConfig
                 {
                     payload_seed = eval["payload_seed"].as<std::int64_t>();
                 }
+                if (eval["motor_curve"])
+                {
+                    load_motor_curve_yaml(eval["motor_curve"], motor_curve);
+                }
                 // A task may toggle the camera and its noise model, but the
                 // mount, profile, frames and topics stay with the robot config.
                 if (eval["depth_camera"])
@@ -226,6 +337,8 @@ inline struct SimulationConfig
                     cfg["depth_camera"] = camera;
                 }
             }
+
+            validate_motor_curve_config(motor_curve);
 
             const auto camera = cfg["depth_camera"];
             depth_camera.enabled = depth_camera_override
@@ -343,7 +456,13 @@ inline po::variables_map helper(int argc, char** argv, const std::filesystem::pa
         ("payload-seed", po::value<std::int64_t>(&config.payload_seed),
          "Payload random seed in [0, 4294967295]")
         ("episode-timeout", po::value<double>(&config.episode_timeout_s),
-         "Episode timeout in simulation seconds");
+         "Episode timeout in simulation seconds")
+        ("motor-curve", po::value<bool>(&config.motor_curve.enabled)->implicit_value(true),
+         "Enable physical motor torque-speed (T-omega) curve")
+        ("motor-curve-mode", po::value<std::string>(&config.motor_curve.mode),
+         "Motor T-omega mode: dc_motor or motoring_only")
+        ("motor-bus-voltage", po::value<double>(&config.motor_curve.bus_voltage_v),
+         "DC bus voltage in Volts for motor T-omega scaling");
 
     po::variables_map vm;
     po::store(po::parse_command_line(argc, argv, desc), vm);
@@ -360,6 +479,11 @@ inline po::variables_map helper(int argc, char** argv, const std::filesystem::pa
                                vm["eval"].as<std::filesystem::path>())
                          : std::nullopt);
     po::notify(vm);
+    if (vm.count("robot") && config.robot != "go2" && !vm.count("motor-curve"))
+    {
+        config.motor_curve.enabled = false;
+    }
+    validate_motor_curve_config(config.motor_curve);
     if (vm.count("max-payload-count"))
     {
         config.max_payload_count = vm["max-payload-count"].as<int>();

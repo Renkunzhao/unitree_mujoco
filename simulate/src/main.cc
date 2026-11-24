@@ -43,6 +43,7 @@
 #include "episode_manager.h"
 #include "episode_monitor.h"
 #include "inertial_gt.h"
+#include "motor_curve.h"
 #include "param.h"
 #include "payload.h"
 #include "ros2_bridge.h"
@@ -120,6 +121,7 @@ namespace
   std::unique_ptr<EpisodeMonitor> episode_monitor;
   std::unique_ptr<EpisodeManager> episode_manager;
   std::unique_ptr<inertial_gt::Publisher> inertial_gt_publisher;
+  std::unique_ptr<MotorCurveLimiter> motor_curve;
   std::mutex model_mutex;
   std::mt19937 payload_random;
   std::optional<payload::Sample> current_payload;
@@ -522,6 +524,25 @@ namespace
     return reset_applied;
   }
 
+  void PrepareControlsForStep(bool add_ctrl_noise)
+  {
+    if (robot_bridge)
+    {
+      robot_bridge->ApplyCommand();
+    }
+    if (add_ctrl_noise && ctrlnoise)
+    {
+      for (int i = 0; i < m->nu; ++i)
+      {
+        d->ctrl[i] += ctrlnoise[i];
+      }
+    }
+    if (motor_curve)
+    {
+      motor_curve->Apply(d);
+    }
+  }
+
   void UpdateEpisodeState()
   {
     if (!episode_manager)
@@ -580,6 +601,8 @@ namespace
           free(ctrlnoise);
           ctrlnoise = (mjtNum *)malloc(sizeof(mjtNum) * m->nu);
           mju_zero(ctrlnoise, m->nu);
+          motor_curve = std::make_unique<MotorCurveLimiter>(
+              MotorCurveLimiter::FromModel(m, param::config.motor_curve));
         }
         else
         {
@@ -615,6 +638,8 @@ namespace
           free(ctrlnoise);
           ctrlnoise = static_cast<mjtNum *>(malloc(sizeof(mjtNum) * m->nu));
           mju_zero(ctrlnoise, m->nu);
+          motor_curve = std::make_unique<MotorCurveLimiter>(
+              MotorCurveLimiter::FromModel(m, param::config.motor_curve));
         }
         else
         {
@@ -688,17 +713,7 @@ namespace
               syncSim = d->time;
               sim.speed_changed = false;
 
-              if (robot_bridge)
-              {
-                robot_bridge->ApplyCommand();
-              }
-              if (sim.ctrl_noise_std)
-              {
-                for (int i = 0; i < m->nu; ++i)
-                {
-                  d->ctrl[i] += ctrlnoise[i];
-                }
-              }
+              PrepareControlsForStep(sim.ctrl_noise_std != 0);
 
               // run single step, let next iteration deal with timing
               mj_step(m, d);
@@ -746,17 +761,7 @@ namespace
                   }
                 }
 
-                if (robot_bridge)
-                {
-                  robot_bridge->ApplyCommand();
-                }
-                if (sim.ctrl_noise_std)
-                {
-                  for (int i = 0; i < m->nu; ++i)
-                  {
-                    d->ctrl[i] += ctrlnoise[i];
-                  }
-                }
+                PrepareControlsForStep(sim.ctrl_noise_std != 0);
 
                 // call mj_step
                 mj_step(m, d);
@@ -793,10 +798,7 @@ namespace
           else
           {
             // run mj_forward, to update rendering and joint sliders
-            if (robot_bridge)
-            {
-              robot_bridge->ApplyCommand();
-            }
+            PrepareControlsForStep(false);
             mj_forward(m, d);
             if (robot_bridge)
             {
@@ -854,6 +856,20 @@ void PhysicsThread(mj::Simulate *sim, const char *filename, bool viewer_enabled)
           throw std::runtime_error("MuJoCo model has neither torso_link nor base_link");
         }
         param::config.band_attached_link = 6 * body_id;
+        motor_curve = std::make_unique<MotorCurveLimiter>(
+            MotorCurveLimiter::FromModel(m, param::config.motor_curve));
+        if (motor_curve->enabled())
+        {
+          RCLCPP_INFO(
+              robot_node->get_logger(),
+              "Motor T-omega curve enabled: mode=%s bus_voltage=%.2fV (nominal=%.2fV, actuators=%zu)",
+              param::config.motor_curve.mode.c_str(), motor_curve->bus_voltage_v(),
+              motor_curve->nominal_voltage_v(), motor_curve->specs().size());
+        }
+        else
+        {
+          RCLCPP_INFO(robot_node->get_logger(), "Motor T-omega curve disabled (XML ctrlrange only)");
+        }
         robot_bridge = CreateRos2Bridge(robot_node, m, d);
         if (param::config.inertial_gt &&
             mj_name2id(m, mjOBJ_BODY, "base_link") >= 0)
@@ -909,6 +925,7 @@ void PhysicsThread(mj::Simulate *sim, const char *filename, bool viewer_enabled)
   }
   free(ctrlnoise);
   ctrlnoise = nullptr;
+  motor_curve.reset();
   inertial_gt_publisher.reset();
   episode_monitor.reset();
   mj_deleteData(d);

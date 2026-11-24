@@ -14,6 +14,21 @@ print_scene_information: 1 # Print link, joint and sensors information of robot
 
 enable_elastic_band: 0 # Virtual spring band, used for lifting h1
 
+# Physical GO-M8010-6 / 8S Li-ion torque-speed (T-omega) envelope (enabled by default for Go2).
+motor_curve:
+  enabled: true
+  mode: "dc_motor"        # "dc_motor" (4Q back-EMF braking) or "motoring_only" (Q1/Q3 derating)
+  nominal_voltage_v: 28.8 # 8S nominal contract matching PHYS_ACTUATOR_PARAMS
+  bus_voltage_v: 28.8
+  hip_thigh:              # 6.33:1 gearbox
+    effort_limit: 23.70
+    saturation_effort: 66.33
+    velocity_limit: 34.64
+  calf:                   # 12.134:1 total ratio
+    effort_limit: 45.43
+    saturation_effort: 127.15
+    velocity_limit: 18.07
+
 # Hardware camera calibration. Task overlays may set `depth_camera.enabled`
 # and `depth_camera.noise`; mount/profile/frames stay here.
 depth_camera:

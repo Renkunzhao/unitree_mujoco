@@ -54,6 +54,7 @@ add_executable(unitree_mujoco
   simulate/src/episode_manager.cc
   simulate/src/episode_monitor.cc
   simulate/src/inertial_gt.cc
+  simulate/src/motor_curve.cc
   simulate/src/payload.cc
   simulate/src/ros2_bridge.cc
   simulate/src/joystick/joystick.cc
@@ -112,6 +113,26 @@ if(BUILD_TESTING)
     string(REPLACE "/" "_" scene_name "${scene_name}")
     add_test(NAME "scene_${scene_name}" COMMAND scene_smoke "${scene}")
   endforeach()
+
+  add_executable(motor_curve_test
+    test/motor_curve_test.cc
+    simulate/src/motor_curve.cc
+  )
+  target_include_directories(motor_curve_test PRIVATE
+    simulate/src
+    "${MUJOCO_DIR}/include"
+  )
+  target_link_libraries(motor_curve_test
+    "${MUJOCO_LIBRARY}"
+    Boost::program_options
+    yaml-cpp::yaml-cpp
+  )
+  add_test(
+    NAME motor_curve_test
+    COMMAND motor_curve_test
+      "${CMAKE_CURRENT_SOURCE_DIR}/unitree_robots/go2/scene.xml"
+      "${CMAKE_CURRENT_SOURCE_DIR}/simulate/config/go2.yaml"
+  )
 endif()
 
 install(TARGETS unitree_mujoco jstest
